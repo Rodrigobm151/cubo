@@ -1,1 +1,763 @@
-index
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rubik Solver - Captura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: white;
+            overflow: hidden;
+            touch-action: none;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        .app-header {
+            position: fixed;
+            top: env(safe-area-inset-top);
+            left: 0; right: 0;
+            height: 44px;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+        }
+        
+        .camera-section {
+            position: fixed;
+            top: calc(env(safe-area-inset-top) + 44px);
+            left: 0; right: 0;
+            height: 35vh;
+            min-height: 250px;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        
+        #video {
+            position: absolute;
+            inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: none;
+            z-index: 1;
+        }
+        
+        .camera-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 5;
+            background: #1a1a1a;
+        }
+        
+        .start-camera-btn {
+            width: 72px; height: 72px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border: 4px solid rgba(255,255,255,0.3);
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 6px 25px rgba(34,197,94,0.5);
+        }
+        
+        .scan-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        
+        .face-progress {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 20;
+        }
+        
+        .face-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .face-dot.active { background: #3b82f6; transform: scale(1.2); }
+        .face-dot.done { background: #22c55e; border-color: #22c55e; }
+        
+        .scan-grid {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(180px, 45vw);
+            height: min(180px, 45vw);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 3px;
+            padding: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+        }
+        
+        .scan-cell {
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+        }
+        
+        .scan-cell.center { border: 3px solid #ef4444; background: rgba(239,68,68,0.2); }
+        .scan-cell.center.detected { border-color: #22c55e; background: rgba(34,197,94,0.3); }
+        
+        .scan-status {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(0,0,0,0.8);
+            z-index: 20;
+            white-space: nowrap;
+        }
+        
+        .scan-status.detected { background: #22c55e; }
+        
+        .shutter-container {
+            position: absolute;
+            bottom: 15px;
+            left: 0; right: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            pointer-events: auto;
+            z-index: 20;
+        }
+        
+        .shutter-btn {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            border: 3px solid white;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .shutter-btn::after {
+            content: '';
+            position: absolute;
+            inset: 3px;
+            border-radius: 50%;
+            background: white;
+        }
+        
+        .shutter-btn.auto-ready::after { background: #22c55e; }
+        .shutter-btn.captured::after { background: #3b82f6; }
+        
+        .upload-btn {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        
+        .editor-section {
+            position: fixed;
+            bottom: env(safe-area-inset-bottom);
+            left: 0; right: 0;
+            top: calc(env(safe-area-inset-top) + 44px + 35vh);
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            z-index: 50;
+        }
+        
+        .editor-main {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            width: 100%;
+            flex: 1;
+            justify-content: center;
+        }
+        
+        .nav-arrow {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .nav-arrow:disabled { opacity: 0.2; }
+        
+        .face-preview {
+            width: 150px; height: 150px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            padding: 6px;
+            background: #2a2a2a;
+            border-radius: 12px;
+        }
+        
+        .face-cell {
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .face-cell.selected {
+            transform: scale(0.9);
+            border-color: #3b82f6;
+            box-shadow: 0 0 15px rgba(59,130,246,0.5);
+        }
+        
+        .face-status {
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.7);
+            margin-top: 8px;
+        }
+        
+        .face-status.locked { background: rgba(34,197,94,0.2); color: #22c55e; }
+        
+        .color-palette {
+            display: flex;
+            gap: 10px;
+            margin: 16px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 30px;
+        }
+        
+        .color-btn {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+        
+        .color-btn.active { border-color: white; transform: scale(1.15); }
+        
+        .action-btn {
+            width: 100%;
+            max-width: 300px;
+            height: 52px;
+            border-radius: 26px;
+            border: none;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: auto;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .action-btn.primary {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+        }
+        
+        .action-btn.solution {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            box-shadow: 0 4px 20px rgba(59,130,246,0.4);
+        }
+        
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+    <div class="app-header">
+        <div id="header-title">Face Branca (Up)</div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+            <span>Auto</span>
+            <div class="toggle-switch" id="auto-toggle" onclick="toggleAuto()" style="width: 44px; height: 24px; background: rgba(255,255,255,0.2); border-radius: 12px; position: relative; cursor: pointer;">
+                <div style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.3s;" id="toggle-knob"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="camera-section">
+        <video id="video" autoplay playsinline muted></video>
+        
+        <div class="camera-placeholder" id="camera-placeholder">
+            <button class="start-camera-btn" onclick="startCamera()">📷</button>
+            <p style="color: rgba(255,255,255,0.7); font-size: 14px;">Toque para iniciar a câmera</p>
+        </div>
+        
+        <div class="scan-overlay" id="scan-overlay">
+            <div class="face-progress" id="face-progress">
+                <div class="face-dot active"></div>
+                <div class="face-dot"></div>
+                <div class="face-dot"></div>
+                <div class="face-dot"></div>
+                <div class="face-dot"></div>
+                <div class="face-dot"></div>
+            </div>
+            
+            <div class="scan-status" id="scan-status">Centralize o cubo</div>
+            
+            <div class="scan-grid" id="scan-grid">
+                <div class="scan-cell" id="cell-0"></div>
+                <div class="scan-cell" id="cell-1"></div>
+                <div class="scan-cell" id="cell-2"></div>
+                <div class="scan-cell" id="cell-3"></div>
+                <div class="scan-cell center" id="cell-4"></div>
+                <div class="scan-cell" id="cell-5"></div>
+                <div class="scan-cell" id="cell-6"></div>
+                <div class="scan-cell" id="cell-7"></div>
+                <div class="scan-cell" id="cell-8"></div>
+            </div>
+            
+            <div class="shutter-container">
+                <button class="upload-btn" onclick="document.getElementById('file-input').click()">📁</button>
+                <button class="shutter-btn" id="shutter-btn" onclick="captureFace()"></button>
+            </div>
+        </div>
+        
+        <input type="file" id="file-input" accept="image/*" capture="environment">
+    </div>
+
+    <div class="editor-section">
+        <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px;">
+            Toque nas cores para editar
+        </div>
+        
+        <div class="editor-main">
+            <button class="nav-arrow" id="arrow-prev" onclick="prevFace()" disabled>←</button>
+            
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div class="face-preview" id="face-preview"></div>
+                <div class="face-status" id="face-status">Aguardando captura...</div>
+            </div>
+            
+            <button class="nav-arrow" id="arrow-next" onclick="nextFace()">→</button>
+        </div>
+        
+        <div class="color-palette" id="color-palette"></div>
+        
+        <button class="action-btn primary" id="action-btn" onclick="handleAction()">
+            Capturar Face
+        </button>
+    </div>
+
+    <script>
+        const FACES = [
+            { code: 'U', name: 'Branca', color: '#FFFFFF', bg: '#f0f0f0' },
+            { code: 'R', name: 'Vermelha', color: '#FF0000', bg: '#ff4444' },
+            { code: 'F', name: 'Verde', color: '#00FF00', bg: '#44ff44' },
+            { code: 'D', name: 'Amarela', color: '#FFFF00', bg: '#ffff44' },
+            { code: 'L', name: 'Laranja', color: '#FFA500', bg: '#ffb347' },
+            { code: 'B', name: 'Azul', color: '#0000FF', bg: '#4444ff' }
+        ];
+        
+        let currentFaceIdx = 0;
+        let isAutoScan = false;
+        let isScanning = false;
+        let isFaceCaptured = false;
+        
+        let cubeState = {
+            U: Array(9).fill(null), R: Array(9).fill(null), F: Array(9).fill(null),
+            D: Array(9).fill(null), L: Array(9).fill(null), B: Array(9).fill(null)
+        };
+        
+        let detectedColors = Array(9).fill('U');
+        let selectedCell = 4;
+        
+        window.onload = () => {
+            initEditor();
+            updateUI();
+            document.getElementById('file-input').addEventListener('change', handleFile);
+        };
+        
+        function initEditor() {
+            const preview = document.getElementById('face-preview');
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'face-cell';
+                cell.onclick = () => selectCell(i);
+                preview.appendChild(cell);
+            }
+            
+            const palette = document.getElementById('color-palette');
+            FACES.forEach(f => {
+                const btn = document.createElement('div');
+                btn.className = 'color-btn';
+                btn.style.background = f.color;
+                btn.onclick = () => applyColor(f.code);
+                palette.appendChild(btn);
+            });
+            
+            selectCell(4);
+            loadFace(0);
+        }
+        
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.style.display = 'block';
+                
+                document.getElementById('camera-placeholder').style.display = 'none';
+                document.getElementById('scan-overlay').style.display = 'block';
+                
+                isScanning = true;
+                isFaceCaptured = false;
+                scanLoop();
+            } catch (e) {
+                alert('Câmera indisponível. Use 📁');
+            }
+        }
+        
+        function scanLoop() {
+            if (!isScanning || isFaceCaptured) return;
+            
+            const video = document.getElementById('video');
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                analyzeFrame(ctx, canvas.width, canvas.height);
+            }
+            requestAnimationFrame(scanLoop);
+        }
+        
+        function analyzeFrame(ctx, w, h) {
+            const cx = w / 2, cy = h / 2;
+            const size = Math.min(w, h) * 0.5;
+            const cellSize = size / 3;
+            
+            const colors = [];
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const x = cx - size/2 + c * cellSize + cellSize/2;
+                    const y = cy - size/2 + r * cellSize + cellSize/2;
+                    const p = getPixel(ctx, x, y);
+                    colors.push(rgbToCode(p.r, p.g, p.b));
+                }
+            }
+            
+            detectedColors = colors;
+            updateScanGrid(colors);
+            
+            const centerColor = colors[4];
+            const expected = FACES[currentFaceIdx].code;
+            const match = (centerColor === expected);
+            
+            const centerCell = document.getElementById('cell-4');
+            const status = document.getElementById('scan-status');
+            const shutter = document.getElementById('shutter-btn');
+            
+            if (match) {
+                centerCell.classList.add('detected');
+                status.textContent = '✓ Pronto! Toque para capturar';
+                status.classList.add('detected');
+                shutter.classList.add('auto-ready');
+                updateEditorPreview(colors);
+            } else {
+                centerCell.classList.remove('detected');
+                status.textContent = `Procure: ${FACES[currentFaceIdx].name}`;
+                status.classList.remove('detected');
+                shutter.classList.remove('auto-ready');
+            }
+        }
+        
+        function updateScanGrid(colors) {
+            colors.forEach((code, i) => {
+                const cell = document.getElementById(`cell-${i}`);
+                if (cell && i !== 4) {
+                    const face = FACES.find(f => f.code === code);
+                    cell.style.background = face ? face.bg : '';
+                    cell.style.opacity = '0.6';
+                }
+            });
+        }
+        
+        function updateEditorPreview(colors) {
+            document.querySelectorAll('.face-cell').forEach((c, i) => {
+                const face = FACES.find(f => f.code === colors[i]);
+                c.style.background = face ? face.color : '#334155';
+            });
+        }
+        
+        function captureFace() {
+            if (isFaceCaptured) return;
+            
+            if (detectedColors[4] !== FACES[currentFaceIdx].code) {
+                navigator.vibrate?.(200);
+                return;
+            }
+            
+            const code = FACES[currentFaceIdx].code;
+            cubeState[code] = [...detectedColors];
+            isFaceCaptured = true;
+            
+            document.getElementById('shutter-btn').classList.add('captured');
+            document.getElementById('scan-status').textContent = '✓ Face salva!';
+            navigator.vibrate?.([50, 100, 50]);
+            
+            updateUI();
+            
+            if (isAutoScan && currentFaceIdx < 5) {
+                setTimeout(() => nextFace(), 800);
+            }
+        }
+        
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                const colors = extractColors(ctx, canvas.width, canvas.height);
+                detectedColors = colors;
+                updateEditorPreview(colors);
+                
+                if (colors[4] === FACES[currentFaceIdx].code) {
+                    setTimeout(() => captureFace(), 500);
+                }
+            };
+            img.src = URL.createObjectURL(file);
+        }
+        
+        function extractColors(ctx, w, h) {
+            const cx = w / 2, cy = h / 2;
+            const size = Math.min(w, h) * 0.6;
+            const cell = size / 3;
+            
+            const colors = [];
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const x = cx - size/2 + c * cell + cell/2;
+                    const y = cy - size/2 + r * cell + cell/2;
+                    const p = getPixel(ctx, x, y);
+                    colors.push(rgbToCode(p.r, p.g, p.b));
+                }
+            }
+            return colors;
+        }
+        
+        function selectCell(idx) {
+            selectedCell = idx;
+            document.querySelectorAll('.face-cell').forEach((c, i) => {
+                c.classList.toggle('selected', i === idx);
+            });
+            
+            const faceCode = FACES[currentFaceIdx].code;
+            const colors = cubeState[faceCode][0] ? cubeState[faceCode] : detectedColors;
+            const colorIdx = FACES.findIndex(f => f.code === colors[idx]);
+            document.querySelectorAll('.color-btn').forEach((b, i) => {
+                b.classList.toggle('active', i === colorIdx);
+            });
+        }
+        
+        function applyColor(code) {
+            const faceCode = FACES[currentFaceIdx].code;
+            if (!cubeState[faceCode][0]) {
+                detectedColors[selectedCell] = code;
+            } else {
+                cubeState[faceCode][selectedCell] = code;
+            }
+            updateEditor();
+            if (selectedCell < 8) selectCell(selectedCell + 1);
+        }
+        
+        function updateEditor() {
+            const faceCode = FACES[currentFaceIdx].code;
+            const colors = cubeState[faceCode][0] ? cubeState[faceCode] : detectedColors;
+            document.querySelectorAll('.face-cell').forEach((c, i) => {
+                const face = FACES.find(f => f.code === colors[i]);
+                c.style.background = face ? face.color : '#334155';
+            });
+        }
+        
+        function loadFace(idx) {
+            currentFaceIdx = idx;
+            isFaceCaptured = false;
+            detectedColors = Array(9).fill(FACES[idx].code);
+            
+            document.getElementById('shutter-btn').classList.remove('captured');
+            for (let i = 0; i < 9; i++) {
+                const cell = document.getElementById(`cell-${i}`);
+                if (cell && i !== 4) {
+                    cell.style.background = '';
+                    cell.style.opacity = '';
+                }
+            }
+            
+            updateEditor();
+            selectCell(4);
+        }
+        
+        function nextFace() {
+            if (currentFaceIdx < 5) {
+                currentFaceIdx++;
+                loadFace(currentFaceIdx);
+                updateUI();
+                if (isScanning) isFaceCaptured = false;
+            } else {
+                goToSolution();
+            }
+        }
+        
+        function prevFace() {
+            if (currentFaceIdx > 0) {
+                currentFaceIdx--;
+                loadFace(currentFaceIdx);
+                updateUI();
+                if (isScanning) isFaceCaptured = false;
+            }
+        }
+        
+        function updateUI() {
+            const f = FACES[currentFaceIdx];
+            document.getElementById('header-title').textContent = `Face ${f.name} (${f.code})`;
+            
+            document.querySelectorAll('.face-dot').forEach((d, i) => {
+                d.className = 'face-dot' + (i < currentFaceIdx ? ' done' : i === currentFaceIdx ? ' active' : '');
+            });
+            
+            document.getElementById('arrow-prev').disabled = currentFaceIdx === 0;
+            document.getElementById('arrow-prev').style.visibility = currentFaceIdx === 0 ? 'hidden' : 'visible';
+            
+            const faceCode = f.code;
+            const isLocked = cubeState[faceCode][0] !== null;
+            const statusEl = document.getElementById('face-status');
+            
+            if (isLocked) {
+                statusEl.textContent = '✓ Face capturada';
+                statusEl.classList.add('locked');
+            } else {
+                statusEl.textContent = 'Aguardando captura...';
+                statusEl.classList.remove('locked');
+            }
+            
+            const actionBtn = document.getElementById('action-btn');
+            if (currentFaceIdx === 5 && isLocked) {
+                actionBtn.textContent = '🎯 Ver Solução';
+                actionBtn.className = 'action-btn solution';
+            } else if (isLocked) {
+                actionBtn.textContent = 'Próxima Face →';
+                actionBtn.className = 'action-btn primary';
+            } else {
+                actionBtn.textContent = 'Capturar Face';
+                actionBtn.className = 'action-btn primary';
+            }
+        }
+        
+        function handleAction() {
+            const f = FACES[currentFaceIdx];
+            const isLocked = cubeState[f.code][0] !== null;
+            
+            if (currentFaceIdx === 5 && isLocked) goToSolution();
+            else if (isLocked) nextFace();
+            else captureFace();
+        }
+        
+        function toggleAuto() {
+            isAutoScan = !isAutoScan;
+            document.getElementById('auto-toggle').style.background = isAutoScan ? '#22c55e' : 'rgba(255,255,255,0.2)';
+            document.getElementById('toggle-knob').style.transform = isAutoScan ? 'translateX(20px)' : '';
+            
+            if (isAutoScan && isScanning && !isFaceCaptured) {
+                if (document.getElementById('scan-status').classList.contains('detected')) {
+                    setTimeout(() => captureFace(), 1000);
+                }
+            }
+        }
+        
+        function goToSolution() {
+            const allFilled = FACES.every(f => cubeState[f.code][0] !== null);
+            if (!allFilled) {
+                alert('Complete todas as faces!');
+                return;
+            }
+            
+            // Salva estado no localStorage para a outra página
+            localStorage.setItem('rubikState', JSON.stringify(cubeState));
+            window.location.href = 'solution.html';
+        }
+        
+        function getPixel(ctx, x, y) {
+            const d = ctx.getImageData(Math.max(0,x-10), Math.max(0,y-10), 20, 20).data;
+            let r=0,g=0,b=0,n=0;
+            for (let i=0; i<d.length; i+=4) { r+=d[i]; g+=d[i+1]; b+=d[i+2]; n++; }
+            return {r:r/n, g:g/n, b:b/n};
+        }
+        
+        function rgbToCode(r,g,b) {
+            const [h,s,v] = rgbToHsv(r,g,b);
+            if (v > 0.75 && s < 0.3) return 'U';
+            if (h > 50 && h < 80 && s > 0.4) return 'D';
+            if (h > 15 && h < 45 && s > 0.5) return 'L';
+            if ((h < 20 || h > 340) && s > 0.4) return 'R';
+            if (h > 85 && h < 160 && s > 0.3) return 'F';
+            if (h > 200 && h < 270 && s > 0.4) return 'B';
+            return v > 0.6 ? 'U' : 'F';
+        }
+        
+        function rgbToHsv(r,g,b) {
+            r/=255; g/=255; b/=255;
+            const max=Math.max(r,g,b), min=Math.min(r,g,b);
+            let h=0,s=0,v=max;
+            const d=max-min;
+            s=max===0?0:d/max;
+            if(max!==min) {
+                switch(max) {
+                    case r: h=(g-b)/d+(g<b?6:0); break;
+                    case g: h=(b-r)/d+2; break;
+                    case b: h=(r-g)/d+4; break;
+                }
+                h/=6;
+            }
+            return [h*360,s,v];
+        }
+    </script>
+</body>
+</html>
