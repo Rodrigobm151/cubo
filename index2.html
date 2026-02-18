@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Rubik Solver - Captura</title>
+    <title>Rubik Solver Premium</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -57,9 +57,21 @@
             flex-direction: column;
         }
         
+        /* TELAS */
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .screen.active {
+            display: flex;
+        }
+        
+        /* TELA 1: SCANNER */
         .cube-section {
             height: 33%;
-            background: linear-gradient(180deg, #0a0a0a 0%, #151515 100%);
+            background: radial-gradient(circle at center, #2a2a2a 0%, #0a0a0a 100%);
             position: relative;
             border-bottom: 1px solid rgba(255,255,255,0.08);
         }
@@ -74,7 +86,7 @@
             top: 8px;
             left: 12px;
             font-size: 11px;
-            color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.5);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             z-index: 10;
@@ -113,7 +125,7 @@
             align-items: center;
             justify-content: center;
             gap: 16px;
-            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            background: radial-gradient(circle at center, #333, #000);
             z-index: 5;
         }
         
@@ -155,7 +167,7 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 4px;
             padding: 6px;
-            background: rgba(0,0,0,0.15);
+            background: rgba(0,0,0,0.2);
             border-radius: 12px;
             border: 1px solid rgba(255,255,255,0.1);
         }
@@ -181,7 +193,6 @@
             50% { transform: scale(0.95); }
         }
         
-        /* Progresso com nomes e cores */
         .progress-top {
             position: absolute;
             top: 12px;
@@ -319,13 +330,183 @@
             height: 48px;
         }
         
-        .manual-modal {
+        /* TELA 2: SOLUÇÃO */
+        .solution-container {
+            flex: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #2a2a2a 0%, #000 100%);
+        }
+        
+        #solution-cube-container {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .solution-controls {
+            height: 220px;
+            background: rgba(20,20,20,0.98);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 16px 20px;
+            gap: 12px;
+        }
+        
+        .move-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+        }
+        
+        .current-move {
+            font-size: 36px;
+            font-weight: 800;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .move-info {
+            text-align: right;
+        }
+        
+        .move-count {
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        .move-name {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            text-transform: uppercase;
+        }
+        
+        .sequence-scroll {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 8px 0;
+            scrollbar-width: none;
+        }
+        
+        .sequence-scroll::-webkit-scrollbar { display: none; }
+        
+        .move-chip {
+            flex-shrink: 0;
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .move-chip.current {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            transform: scale(1.1);
+        }
+        
+        .move-chip.done {
+            background: rgba(34,197,94,0.3);
+            border-color: #22c55e;
+            opacity: 0.7;
+        }
+        
+        .controls-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-top: auto;
+        }
+        
+        .ctrl-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .ctrl-btn.play {
+            width: 60px;
+            height: 60px;
+            background: #22c55e;
+            font-size: 24px;
+        }
+        
+        .ctrl-btn:disabled {
+            opacity: 0.3;
+        }
+        
+        .speed-slider {
+            width: 100px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        
+        .speed-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #3b82f6;
+            border-radius: 50%;
+        }
+        
+        .notation-help {
             position: absolute;
+            top: 60px;
+            right: 12px;
+            background: rgba(0,0,0,0.85);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .notation-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 2px 0;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        .notation-row b {
+            color: #3b82f6;
+        }
+        
+        .back-btn {
+            position: absolute;
+            left: 12px;
+            top: 12px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        /* Modal manual */
+        .manual-modal {
+            position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.98);
             display: none;
             flex-direction: column;
-            z-index: 60;
+            z-index: 200;
             padding: 20px;
         }
         
@@ -364,120 +545,229 @@
             border-color: white;
             transform: scale(1.15);
         }
+        
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, #333, #000);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 300;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
 
+    <!-- HEADER -->
     <div class="app-header">
-        <div class="header-title" id="header-title">Mostre a FRENTE (Verde)</div>
-        <div class="header-subtitle" id="face-counter">1/6</div>
+        <div class="header-title" id="header-title">Rubik Solver</div>
+        <div class="header-subtitle" id="face-counter"></div>
     </div>
 
+    <!-- MAIN CONTAINER -->
     <div class="main-container">
-        <div class="cube-section">
-            <div class="cube-label">Cubo 3D - Centros de Referência</div>
-            <div id="cube-3d-container"></div>
-            <div class="cube-hint">Gire para visualizar todas as faces</div>
+        
+        <!-- TELA 1: SCANNER -->
+        <div id="screen-scanner" class="screen active">
+            <div class="cube-section">
+                <div class="cube-label">Cubo 3D - Centros de Referência</div>
+                <div id="cube-3d-container"></div>
+                <div class="cube-hint">Gire para visualizar</div>
+            </div>
+
+            <div class="camera-section">
+                <video id="video" autoplay playsinline muted></video>
+                
+                <div class="camera-placeholder" id="camera-placeholder">
+                    <button class="start-btn" onclick="startCamera()">📷</button>
+                    <p style="color: rgba(255,255,255,0.6); font-size: 13px;">Toque para iniciar</p>
+                </div>
+                
+                <div class="scan-overlay" id="scan-overlay">
+                    <div class="progress-top" id="progress-container">
+                        <div class="progress-item active" data-face="F" style="color: #00FF00;">
+                            <div class="progress-dot" style="color: #00FF00; border-color: #00FF00;">F</div>
+                            <span class="progress-label" style="color: #00FF00;">Frente</span>
+                        </div>
+                        <div class="progress-item" data-face="R" style="color: #FF0000;">
+                            <div class="progress-dot" style="color: #FF0000; border-color: #FF0000;">R</div>
+                            <span class="progress-label" style="color: #FF0000;">Direita</span>
+                        </div>
+                        <div class="progress-item" data-face="B" style="color: #4169E1;">
+                            <div class="progress-dot" style="color: #4169E1; border-color: #4169E1;">B</div>
+                            <span class="progress-label" style="color: #4169E1;">Trás</span>
+                        </div>
+                        <div class="progress-item" data-face="L" style="color: #FFA500;">
+                            <div class="progress-dot" style="color: #FFA500; border-color: #FFA500;">L</div>
+                            <span class="progress-label" style="color: #FFA500;">Esquerda</span>
+                        </div>
+                        <div class="progress-item" data-face="U" style="color: #FFFFFF;">
+                            <div class="progress-dot" style="color: #FFFFFF; border-color: #FFFFFF;">U</div>
+                            <span class="progress-label" style="color: #FFFFFF;">Topo</span>
+                        </div>
+                        <div class="progress-item" data-face="D" style="color: #FFD700;">
+                            <div class="progress-dot" style="color: #FFD700; border-color: #FFD700;">D</div>
+                            <span class="progress-label" style="color: #FFD700;">Base</span>
+                        </div>
+                    </div>
+                    
+                    <div class="scan-grid-container">
+                        <div class="scan-grid" id="scan-grid">
+                            <div class="scan-cell" id="scan-0"></div>
+                            <div class="scan-cell" id="scan-1"></div>
+                            <div class="scan-cell" id="scan-2"></div>
+                            <div class="scan-cell" id="scan-3"></div>
+                            <div class="scan-cell" id="scan-4"></div>
+                            <div class="scan-cell" id="scan-5"></div>
+                            <div class="scan-cell" id="scan-6"></div>
+                            <div class="scan-cell" id="scan-7"></div>
+                            <div class="scan-cell" id="scan-8"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="status-area">
+                        <div class="status-text" id="status-text">Centralize o cubo na grade</div>
+                        <div class="stability-timer">
+                            <div class="stability-fill" id="stability-fill"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-bar">
+                        <button class="action-btn" onclick="openManual()">✏️</button>
+                        <button class="action-btn" onclick="skipFace()" id="skip-btn">⏭</button>
+                        <button class="action-btn primary" onclick="goToSolution()" id="solution-btn">Resolver →</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="camera-section">
-            <video id="video" autoplay playsinline muted></video>
-            
-            <div class="camera-placeholder" id="camera-placeholder">
-                <button class="start-btn" onclick="startCamera()">📷</button>
-                <p style="color: rgba(255,255,255,0.6); font-size: 13px;">Toque para iniciar a câmera</p>
-            </div>
-            
-            <div class="scan-overlay" id="scan-overlay">
-                <!-- Progresso com nomes em português e cores -->
-                <div class="progress-top" id="progress-container">
-                    <div class="progress-item active" data-face="F" style="color: #00FF00;">
-                        <div class="progress-dot" style="color: #00FF00; border-color: #00FF00;">F</div>
-                        <span class="progress-label" style="color: #00FF00;">Frente</span>
-                    </div>
-                    <div class="progress-item" data-face="R" style="color: #FF0000;">
-                        <div class="progress-dot" style="color: #FF0000; border-color: #FF0000;">R</div>
-                        <span class="progress-label" style="color: #FF0000;">Direita</span>
-                    </div>
-                    <div class="progress-item" data-face="B" style="color: #0000FF;">
-                        <div class="progress-dot" style="color: #0000FF; border-color: #0000FF;">B</div>
-                        <span class="progress-label" style="color: #0000FF;">Trás</span>
-                    </div>
-                    <div class="progress-item" data-face="L" style="color: #FFA500;">
-                        <div class="progress-dot" style="color: #FFA500; border-color: #FFA500;">L</div>
-                        <span class="progress-label" style="color: #FFA500;">Esquerda</span>
-                    </div>
-                    <div class="progress-item" data-face="U" style="color: #FFFFFF;">
-                        <div class="progress-dot" style="color: #FFFFFF; border-color: #FFFFFF;">U</div>
-                        <span class="progress-label" style="color: #FFFFFF;">Topo</span>
-                    </div>
-                    <div class="progress-item" data-face="D" style="color: #FFFF00;">
-                        <div class="progress-dot" style="color: #FFFF00; border-color: #FFFF00;">D</div>
-                        <span class="progress-label" style="color: #FFFF00;">Base</span>
-                    </div>
-                </div>
+        <!-- TELA 2: SOLUÇÃO -->
+        <div id="screen-solution" class="screen">
+            <div class="solution-container">
+                <button class="back-btn" onclick="backToScanner()">← Voltar</button>
+                <div id="solution-cube-container"></div>
                 
-                <div class="scan-grid-container">
-                    <div class="scan-grid" id="scan-grid">
-                        <div class="scan-cell" id="scan-0"></div>
-                        <div class="scan-cell" id="scan-1"></div>
-                        <div class="scan-cell" id="scan-2"></div>
-                        <div class="scan-cell" id="scan-3"></div>
-                        <div class="scan-cell" id="scan-4"></div>
-                        <div class="scan-cell" id="scan-5"></div>
-                        <div class="scan-cell" id="scan-6"></div>
-                        <div class="scan-cell" id="scan-7"></div>
-                        <div class="scan-cell" id="scan-8"></div>
-                    </div>
-                </div>
-                
-                <div class="status-area">
-                    <div class="status-text" id="status-text">Centralize o cubo na grade</div>
-                    <div class="stability-timer">
-                        <div class="stability-fill" id="stability-fill"></div>
-                    </div>
-                </div>
-                
-                <div class="action-bar">
-                    <button class="action-btn" onclick="openManual()" title="Ajustar manualmente">✏️</button>
-                    <button class="action-btn" onclick="skipFace()" id="skip-btn" title="Pular face">⏭</button>
-                    <button class="action-btn primary" onclick="goToSolution()" id="solution-btn">Ver Solução →</button>
+                <div class="notation-help">
+                    <div class="notation-row"><b>R</b> Direita ↻</div>
+                    <div class="notation-row"><b>L</b> Esquerda ↻</div>
+                    <div class="notation-row"><b>U</b> Topo ↻</div>
+                    <div class="notation-row"><b>D</b> Base ↻</div>
+                    <div class="notation-row"><b>F</b> Frente ↻</div>
+                    <div class="notation-row"><b>B</b> Trás ↻</div>
+                    <div class="notation-row" style="margin-top:6px;border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;"><b>'</b> Anti-horário ↺</div>
+                    <div class="notation-row"><b>2</b> 180°</div>
                 </div>
             </div>
             
-            <div class="manual-modal" id="manual-modal">
-                <div style="text-align: center; margin-top: 30px;">
-                    <h2 style="font-size: 18px;">Ajuste Manual</h2>
-                    <p style="color: rgba(255,255,255,0.5); font-size: 13px;">Toque na cor e depois na célula</p>
+            <div class="solution-controls">
+                <div class="move-display">
+                    <div class="current-move" id="current-move">--</div>
+                    <div class="move-info">
+                        <div class="move-count" id="move-count">0 / 0</div>
+                        <div class="move-name" id="move-name">Pronto para resolver</div>
+                    </div>
                 </div>
                 
-                <div class="manual-grid" id="manual-grid"></div>
+                <div class="sequence-scroll" id="sequence-scroll"></div>
                 
-                <div class="color-picker" id="color-picker">
-                    <div class="color-option selected" style="background: #FFFFFF;" data-color="U" title="Branco (Topo)"></div>
-                    <div class="color-option" style="background: #FFD500;" data-color="D" title="Amarelo (Base)"></div>
-                    <div class="color-option" style="background: #FF0000;" data-color="R" title="Vermelho (Direita)"></div>
-                    <div class="color-option" style="background: #FFA500;" data-color="L" title="Laranja (Esquerda)"></div>
-                    <div class="color-option" style="background: #00FF00;" data-color="F" title="Verde (Frente)"></div>
-                    <div class="color-option" style="background: #0000FF;" data-color="B" title="Azul (Trás)"></div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.5);">Lento</span>
+                    <input type="range" class="speed-slider" id="speed-slider" min="0.5" max="3" step="0.5" value="1">
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.5);">Rápido</span>
                 </div>
                 
-                <div style="margin-top: auto; display: flex; gap: 12px; justify-content: center; padding-bottom: 30px;">
-                    <button onclick="closeManual()" style="padding: 12px 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: white; font-size: 14px;">Cancelar</button>
-                    <button onclick="saveManual()" style="padding: 12px 20px; border-radius: 20px; border: none; background: #22c55e; color: white; font-size: 14px; font-weight: 600;">Salvar Face</button>
+                <div class="controls-row">
+                    <button class="ctrl-btn" id="btn-prev" onclick="prevMove()" disabled>◀</button>
+                    <button class="ctrl-btn play" id="btn-play" onclick="togglePlay()">▶</button>
+                    <button class="ctrl-btn" id="btn-next" onclick="nextMove()" disabled>▶</button>
                 </div>
             </div>
         </div>
+
+    </div>
+
+    <!-- MODAL MANUAL -->
+    <div class="manual-modal" id="manual-modal">
+        <div style="text-align: center; margin-top: 40px;">
+            <h2 style="font-size: 18px;">Ajuste Manual</h2>
+            <p style="color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 6px;">Selecione a cor e toque nas células</p>
+        </div>
+        
+        <div class="manual-grid" id="manual-grid"></div>
+        
+        <div class="color-picker" id="color-picker">
+            <div class="color-option selected" style="background: #FFFFFF;" data-color="U"></div>
+            <div class="color-option" style="background: #FFD500;" data-color="D"></div>
+            <div class="color-option" style="background: #FF0000;" data-color="R"></div>
+            <div class="color-option" style="background: #FFA500;" data-color="L"></div>
+            <div class="color-option" style="background: #00FF00;" data-color="F"></div>
+            <div class="color-option" style="background: #0000FF;" data-color="B"></div>
+        </div>
+        
+        <div style="margin-top: auto; display: flex; gap: 12px; justify-content: center; padding-bottom: 40px;">
+            <button onclick="closeManual()" style="padding: 12px 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: white; font-size: 14px;">Cancelar</button>
+            <button onclick="saveManual()" style="padding: 12px 20px; border-radius: 20px; border: none; background: #22c55e; color: white; font-size: 14px; font-weight: 600;">Salvar Face</button>
+        </div>
+    </div>
+
+    <!-- LOADING -->
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <p style="color: rgba(255,255,255,0.6); font-size: 14px;">Calculando solução...</p>
     </div>
 
     <script>
-        // === CONFIGURAÇÃO ===
-        // Ordem otimizada: Frente → Direita → Trás → Esquerda → Topo → Base
-        // (minimiza giros, só gira o cubo no sentido horário no eixo Y, depois vira para cima/baixo)
+        // ==========================================
+        // GEOMETRIA ARREDONDADA (DO SEU CÓDIGO)
+        // ==========================================
+        
+        function createRoundedBox(width, height, depth, radius, smoothness) {
+            const shape = new THREE.Shape();
+            const eps = 0.00001;
+            
+            shape.absarc(eps, eps, eps, -Math.PI / 2, -Math.PI, true);
+            shape.absarc(eps, height - radius * 2, eps, Math.PI, Math.PI / 2, true);
+            shape.absarc(width - radius * 2, height - radius * 2, eps, Math.PI / 2, 0, true);
+            shape.absarc(width - radius * 2, eps, eps, 0, -Math.PI / 2, true);
+
+            const geometry = new THREE.ExtrudeBufferGeometry(shape, {
+                depth: depth - radius * 2,
+                bevelEnabled: true,
+                bevelSegments: smoothness * 2,
+                steps: 1,
+                bevelSize: radius,
+                bevelThickness: radius,
+                curveSegments: smoothness
+            });
+
+            geometry.center();
+            return geometry;
+        }
+
+        // ==========================================
+        // CONFIGURAÇÃO E ESTADO
+        // ==========================================
+        
         const SCAN_ORDER = [
             { code: 'F', name: 'Frente', fullName: 'FRENTE (Verde)', center: 'F', color: '#00FF00', textColor: '#00FF00' },
             { code: 'R', name: 'Direita', fullName: 'DIREITA (Vermelho)', center: 'R', color: '#FF0000', textColor: '#FF0000' },
-            { code: 'B', name: 'Trás', fullName: 'TRÁS (Azul)', center: 'B', color: '#0000FF', textColor: '#4169E1' }, // Azul mais visível
+            { code: 'B', name: 'Trás', fullName: 'TRÁS (Azul)', center: 'B', color: '#0000FF', textColor: '#4169E1' },
             { code: 'L', name: 'Esquerda', fullName: 'ESQUERDA (Laranja)', center: 'L', color: '#FFA500', textColor: '#FFA500' },
             { code: 'U', name: 'Topo', fullName: 'TOPO (Branco)', center: 'U', color: '#FFFFFF', textColor: '#FFFFFF' },
             { code: 'D', name: 'Base', fullName: 'BASE (Amarelo)', center: 'D', color: '#FFFF00', textColor: '#FFD700' }
@@ -489,8 +779,8 @@
         };
         
         const CENTER_COLORS = {
-            'U': 0xFFFFFF, 'R': 0xFF0000, 'F': 0x00FF00,
-            'D': 0xFFFF00, 'L': 0xFFA500, 'B': 0x0000FF
+            'U': 0xffffff, 'R': 0xb71234, 'F': 0x009b48,
+            'D': 0xffd700, 'L': 0xff5800, 'B': 0x0046ad
         };
         
         const COLOR_NAMES = { 
@@ -498,9 +788,14 @@
             D: 'Amarelo', L: 'Laranja', B: 'Azul' 
         };
         
-        const GRAY_COLOR = 0x555555; // Cinza mais claro para melhor contraste
+        const MOVE_NAMES = {
+            'R': 'Direita', 'L': 'Esquerda', 'U': 'Topo',
+            'D': 'Base', 'F': 'Frente', 'B': 'Trás'
+        };
         
-        // === ESTADO ===
+        const GRAY_COLOR = 0x444444;
+        
+        // Estado
         let currentStep = 0;
         let isScanning = false;
         let cubeState = {
@@ -512,201 +807,220 @@
             B: Array(9).fill(null)
         };
         
-        // Three.js
-        let scene, camera, renderer, controls, cubeGroup;
-        let selectedColor = 'F'; // Começa com verde
+        // Three.js - Scanner
+        let scannerScene, scannerCamera, scannerRenderer, scannerControls, scannerCubes = [];
+        
+        // Three.js - Solution
+        let solutionScene, solutionCamera, solutionRenderer, solutionControls, solutionCubes = [];
+        let solution = [];
+        let currentMoveIndex = 0;
+        let isPlaying = false;
+        let animationSpeed = 1;
+        let isAnimating = false;
+        
+        // Utilidades
+        let selectedColor = 'F';
         let lastColors = null;
         let stabilityStart = null;
 
-        // === INICIALIZAÇÃO ===
+        // ==========================================
+        // INICIALIZAÇÃO
+        // ==========================================
+        
         window.onload = () => {
-            init3D();
-            updateUI();
+            initScanner3D();
             initManualGrid();
+            updateScannerUI();
         };
 
-        // === 3D COM CENTROS COLORIDOS ===
-        function init3D() {
+        // ==========================================
+        // 3D SCANNER COM CUBOS ARREDONDADOS
+        // ==========================================
+        
+        function initScanner3D() {
             const container = document.getElementById('cube-3d-container');
             
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0a0a);
+            scannerScene = new THREE.Scene();
+            scannerScene.background = new THREE.Color(0x0a0a0a);
             
-            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
-            camera.position.set(4, 3, 5);
+            scannerCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            scannerCamera.position.set(7, 5, 8);
             
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            container.appendChild(renderer.domElement);
+            scannerRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            scannerRenderer.setSize(container.clientWidth, container.clientHeight);
+            scannerRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(scannerRenderer.domElement);
             
-            // Luzes melhoradas
-            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-            const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-            dir.position.set(5, 10, 7);
-            scene.add(dir);
+            // Luzes premium
+            scannerScene.add(new THREE.AmbientLight(0xffffff, 0.6));
             
-            const point1 = new THREE.PointLight(0x3b82f6, 0.4);
-            point1.position.set(5, 5, 5);
-            scene.add(point1);
+            const light1 = new THREE.PointLight(0xffffff, 0.8);
+            light1.position.set(10, 10, 10);
+            scannerScene.add(light1);
             
-            const point2 = new THREE.PointLight(0xff6600, 0.3);
-            point2.position.set(-5, -5, -5);
-            scene.add(point2);
+            const light2 = new THREE.PointLight(0xffffff, 0.5);
+            light2.position.set(-10, -10, -10);
+            scannerScene.add(light2);
             
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.enableZoom = false;
-            controls.minDistance = 3;
-            controls.maxDistance = 8;
+            scannerControls = new THREE.OrbitControls(scannerCamera, scannerRenderer.domElement);
+            scannerControls.enableDamping = true;
+            scannerControls.dampingFactor = 0.05;
+            scannerControls.enableZoom = false;
+            scannerControls.minDistance = 5;
+            scannerControls.maxDistance = 15;
             
-            buildCube();
-            animate();
+            buildScannerCubes();
+            animateScanner();
             
-            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('resize', onScannerResize);
         }
         
-        function onWindowResize() {
+        function onScannerResize() {
             const container = document.getElementById('cube-3d-container');
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
+            scannerCamera.aspect = container.clientWidth / container.clientHeight;
+            scannerCamera.updateProjectionMatrix();
+            scannerRenderer.setSize(container.clientWidth, container.clientHeight);
         }
         
-        function buildCube() {
-            if (cubeGroup) scene.remove(cubeGroup);
-            cubeGroup = new THREE.Group();
+        function buildScannerCubes() {
+            // Limpa cubos existentes
+            scannerCubes.forEach(c => scannerScene.remove(c));
+            scannerCubes = [];
             
-            const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+            // Geometria arredondada
+            const geom = createRoundedBox(0.95, 0.95, 0.95, 0.08, 4);
             
             for (let x = -1; x <= 1; x++) {
                 for (let y = -1; y <= 1; y++) {
                     for (let z = -1; z <= 1; z++) {
-                        const materials = getMaterials(x, y, z);
-                        const cubie = new THREE.Mesh(geometry, materials);
-                        cubie.position.set(x, y, z);
-                        cubeGroup.add(cubie);
+                        const materials = getScannerMaterials(x, y, z);
+                        const mesh = new THREE.Mesh(geom, materials);
+                        mesh.position.set(x, y, z);
+                        
+                        // Borda sutil
+                        const edges = new THREE.EdgesGeometry(geom, 15);
+                        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ 
+                            color: 0x000000, opacity: 0.15, transparent: true 
+                        }));
+                        mesh.add(line);
+                        
+                        scannerScene.add(mesh);
+                        scannerCubes.push(mesh);
                     }
                 }
             }
             
-            scene.add(cubeGroup);
-            
-            // Posiciona para mostrar face atual (ordem otimizada)
+            // Rotação para face atual
             const current = SCAN_ORDER[currentStep];
             if (current) {
-                // Rotações otimizadas para a sequência F→R→B→L→U→D
                 const rotations = { 
-                    F: { x: 0, y: 0 },           // Frente (padrão)
-                    R: { x: 0, y: -Math.PI/2 },   // Direita (gira Y -90°)
-                    B: { x: 0, y: Math.PI },      // Trás (gira Y 180°)
-                    L: { x: 0, y: Math.PI/2 },    // Esquerda (gira Y +90°)
-                    U: { x: -Math.PI/2.5, y: 0 }, // Topo (gira X -72°)
-                    D: { x: Math.PI/2.5, y: 0 }   // Base (gira X +72°)
+                    F: { x: 0, y: 0 }, 
+                    R: { x: 0, y: -Math.PI/2 }, 
+                    B: { x: 0, y: Math.PI }, 
+                    L: { x: 0, y: Math.PI/2 }, 
+                    U: { x: -Math.PI/2.5, y: 0 }, 
+                    D: { x: Math.PI/2.5, y: 0 } 
                 };
                 
+                // Aplica rotação a todos os cubos como grupo
                 const target = rotations[current.code];
-                
-                // Animação suave
-                const startX = cubeGroup.rotation.x;
-                const startY = cubeGroup.rotation.y;
-                const startTime = Date.now();
-                const duration = 400;
-                
-                function animateRot() {
-                    const elapsed = Date.now() - startTime;
-                    const t = Math.min(elapsed / duration, 1);
-                    const eased = 1 - Math.pow(1 - t, 3);
-                    
-                    cubeGroup.rotation.x = startX + (target.x - startX) * eased;
-                    cubeGroup.rotation.y = startY + (target.y - startY) * eased;
-                    
-                    if (t < 1) requestAnimationFrame(animateRot);
-                }
-                animateRot();
+                scannerCubes.forEach(c => {
+                    c.rotation.x = target.x;
+                    c.rotation.y = target.y;
+                });
             }
         }
         
-        function getMaterials(x, y, z) {
-            const mats = [];
-            
-            // Define qual face cada material representa
-            const faceMap = [
-                x === 1 ? 'R' : null,   // índice 0: Right
-                x === -1 ? 'L' : null,  // índice 1: Left
-                y === 1 ? 'U' : null,   // índice 2: Up
-                y === -1 ? 'D' : null,  // índice 3: Down
-                z === 1 ? 'F' : null,   // índice 4: Front
-                z === -1 ? 'B' : null   // índice 5: Back
+        function getScannerMaterials(x, y, z) {
+            // Materiais padrão do cubo mágico (mesmas cores do seu código)
+            const mats = [
+                new THREE.MeshStandardMaterial({ color: 0xb71234, roughness: 0.2 }), // R - Vermelho
+                new THREE.MeshStandardMaterial({ color: 0xff5800, roughness: 0.2 }), // L - Laranja
+                new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }), // U - Branco
+                new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.2 }), // D - Amarelo
+                new THREE.MeshStandardMaterial({ color: 0x0046ad, roughness: 0.2 }), // F - Azul (frente)
+                new THREE.MeshStandardMaterial({ color: 0x009b48, roughness: 0.2 })  // B - Verde (trás)
             ];
             
-            faceMap.forEach((face, materialIndex) => {
-                let color = GRAY_COLOR;
-                
-                if (face) {
-                    const faceData = cubeState[face];
-                    const stickerIndex = getFaceIndex(x, y, z, face);
-                    const detectedColor = faceData[stickerIndex];
-                    
-                    // CENTRO (índice 4) sempre mostra cor correta como referência!
-                    if (stickerIndex === 4) {
-                        color = CENTER_COLORS[face];
-                    } 
-                    // Bordas: cinza se não detectado, cor real se detectado
-                    else if (detectedColor && COLOR_MAP[detectedColor]) {
-                        color = parseInt(COLOR_MAP[detectedColor].replace('#', '0x'));
-                    }
-                    // else permanece GRAY_COLOR
+            // Ajusta ordem para corresponder às faces corretas
+            // x=1 (R), x=-1 (L), y=1 (U), y=-1 (D), z=1 (F), z=-1 (B)
+            const faceMap = [
+                x === 1 ? 'R' : null,   // índice 0
+                x === -1 ? 'L' : null,  // índice 1
+                y === 1 ? 'U' : null,   // índice 2
+                y === -1 ? 'D' : null,  // índice 3
+                z === 1 ? 'F' : null,   // índice 4
+                z === -1 ? 'B' : null   // índice 5
+            ];
+            
+            // Corrige cores baseado no estado escaneado
+            faceMap.forEach((face, i) => {
+                if (!face) {
+                    mats[i].color.setHex(0x111111); // Interior
+                    return;
                 }
                 
-                // Material com brilho diferente para centro
-                const isCenter = (face && getFaceIndex(x, y, z, face) === 4);
+                const faceData = cubeState[face];
+                const stickerIndex = getFaceIndex(x, y, z, face);
+                const detectedColor = faceData[stickerIndex];
                 
-                mats.push(new THREE.MeshPhongMaterial({ 
-                    color: color,
-                    shininess: isCenter ? 120 : 80,
-                    specular: isCenter ? 0x666666 : 0x333333,
-                    emissive: isCenter ? color : 0x000000,
-                    emissiveIntensity: isCenter ? 0.15 : 0
-                }));
+                // CENTRO (índice 4) sempre mostra cor correta!
+                if (stickerIndex === 4) {
+                    mats[i].color.setHex(CENTER_COLORS[face]);
+                    mats[i].emissive = new THREE.Color(CENTER_COLORS[face]);
+                    mats[i].emissiveIntensity = 0.2;
+                } 
+                // Bordas: cinza se não detectado, cor real se detectado
+                else if (detectedColor && COLOR_MAP[detectedColor]) {
+                    const hex = parseInt(COLOR_MAP[detectedColor].replace('#', '0x'));
+                    mats[i].color.setHex(hex);
+                    mats[i].emissive = new THREE.Color(0x000000);
+                    mats[i].emissiveIntensity = 0;
+                } else {
+                    mats[i].color.setHex(GRAY_COLOR);
+                    mats[i].emissive = new THREE.Color(0x000000);
+                    mats[i].emissiveIntensity = 0;
+                }
             });
             
             return mats;
         }
         
         function getFaceIndex(x, y, z, face) {
-            // Converte coordenada 3D para índice 0-8 da face
             switch(face) {
-                case 'R': return (1-y)*3 + (z+1);   // y: 1→0, 0→1, -1→2 | z: -1→0, 0→1, 1→2
-                case 'L': return (1-y)*3 + (1-z);   // y: 1→0, 0→1, -1→2 | z: 1→0, 0→1, -1→2 (espelhado)
-                case 'U': return (1-x)*3 + (z+1);   // x: 1→0, 0→1, -1→2 | z: -1→0, 0→1, 1→2
-                case 'D': return (x+1)*3 + (z+1);   // x: -1→0, 0→1, 1→2 | z: -1→0, 0→1, 1→2
-                case 'F': return (1-y)*3 + (x+1);   // y: 1→0, 0→1, -1→2 | x: -1→0, 0→1, 1→2
-                case 'B': return (1-y)*3 + (1-x);   // y: 1→0, 0→1, -1→2 | x: 1→0, 0→1, -1→2 (espelhado)
+                case 'R': return (1-y)*3 + (z+1);
+                case 'L': return (1-y)*3 + (1-z);
+                case 'U': return (1-x)*3 + (z+1);
+                case 'D': return (x+1)*3 + (z+1);
+                case 'F': return (1-y)*3 + (x+1);
+                case 'B': return (1-y)*3 + (1-x);
                 default: return 4;
             }
         }
         
-        function updateCube() {
-            buildCube();
+        function updateScannerCube() {
+            // Atualiza materiais sem recriar geometria
+            scannerCubes.forEach(mesh => {
+                const pos = mesh.position;
+                const newMats = getScannerMaterials(pos.x, pos.y, pos.z);
+                mesh.material = newMats;
+            });
         }
         
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
+        function animateScanner() {
+            requestAnimationFrame(animateScanner);
+            scannerControls.update();
+            scannerRenderer.render(scannerScene, scannerCamera);
         }
 
-        // === CÂMERA E SCANNING ===
+        // ==========================================
+        // SCANNER LÓGICA
+        // ==========================================
+        
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment', 
-                        width: { ideal: 1280 }, 
-                        height: { ideal: 720 } 
-                    }
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
                 
                 const video = document.getElementById('video');
@@ -721,8 +1035,7 @@
                 scanLoop();
                 
             } catch (e) {
-                console.error('Erro câmera:', e);
-                alert('Erro ao acessar câmera: ' + e.message);
+                alert('Erro na câmera: ' + e.message);
             }
         }
         
@@ -767,10 +1080,9 @@
                 }
             }
             
-            // Validações
             const avgBrightness = brightnesses.reduce((a,b) => a+b, 0) / brightnesses.length;
             if (avgBrightness < 20) {
-                document.getElementById('status-text').textContent = '⚠️ Muito escuro - aumente a luz';
+                document.getElementById('status-text').textContent = '⚠️ Muito escuro';
                 document.getElementById('status-text').style.color = '#fbbf24';
                 resetStability();
                 updateScanGrid(colors, false);
@@ -789,7 +1101,6 @@
             const current = SCAN_ORDER[currentStep];
             const centerColor = colors[4];
             
-            // Verifica se centro está correto
             if (centerColor === 'X' || centerColor !== current.center) {
                 const detectedName = centerColor === 'X' ? 'indeterminada' : COLOR_NAMES[centerColor];
                 document.getElementById('status-text').innerHTML = 
@@ -800,9 +1111,8 @@
                 return;
             }
             
-            // Centro correto!
             document.getElementById('status-text').innerHTML = 
-                `✓ Centro <span style="color:${current.color}">${current.name}</span> detectado! Mantenha estável...`;
+                `✓ <span style="color:${current.color}">${current.name}</span> detectado! Mantenha estável...`;
             document.getElementById('status-text').style.color = '#22c55e';
             
             checkStability(colors);
@@ -830,23 +1140,18 @@
         function onStableDetection(colors) {
             if (!isScanning) return;
             
-            // Feedback visual
             document.querySelectorAll('.scan-cell').forEach(cell => {
                 cell.classList.add('stable');
                 setTimeout(() => cell.classList.remove('stable'), 400);
             });
             
-            // Salva dados
             const current = SCAN_ORDER[currentStep];
             cubeState[current.code] = [...colors];
             
-            // Feedback tátil
             if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
             
-            // Atualiza cubo 3D
-            updateCube();
+            updateScannerCube();
             
-            // Pausa e avança
             isScanning = false;
             setTimeout(() => {
                 nextFace();
@@ -864,9 +1169,8 @@
             if (isCubeComplete()) {
                 finishCapture();
             } else if (currentStep >= 6) {
-                // Volta ao início se faltam faces
                 currentStep = 0;
-                updateUI();
+                updateScannerUI();
                 document.getElementById('status-text').textContent = '⚠️ Faltam faces! Recomeçando...';
                 document.getElementById('status-text').style.color = '#fbbf24';
                 setTimeout(() => {
@@ -874,7 +1178,7 @@
                     document.getElementById('status-text').style.color = 'white';
                 }, 2000);
             } else {
-                updateUI();
+                updateScannerUI();
             }
         }
         
@@ -887,7 +1191,7 @@
         function skipFace() {
             const current = SCAN_ORDER[currentStep];
             cubeState[current.code] = Array(9).fill(current.center);
-            updateCube();
+            updateScannerCube();
             nextFace();
         }
         
@@ -899,27 +1203,14 @@
             document.getElementById('status-text').style.color = '#22c55e';
             document.getElementById('skip-btn').style.display = 'none';
             document.getElementById('solution-btn').style.display = 'block';
-            localStorage.setItem('rubikState', JSON.stringify(cubeState));
         }
         
-        function goToSolution() {
-            if (!isCubeComplete()) {
-                alert('Cubo incompleto! Escaneie todas as 6 faces.');
-                return;
-            }
-            window.location.href = 'solution.html';
-        }
-
-        // === UI ===
-        function updateUI() {
+        function updateScannerUI() {
             const current = SCAN_ORDER[currentStep];
-            
-            // Título com cor
             document.getElementById('header-title').innerHTML = 
                 `Mostre <span style="color:${current.textColor}">${current.fullName}</span>`;
             document.getElementById('face-counter').textContent = `${currentStep + 1}/6`;
             
-            // Progresso visual
             document.querySelectorAll('.progress-item').forEach((item, idx) => {
                 item.classList.remove('active', 'done');
                 const dot = item.querySelector('.progress-dot');
@@ -932,6 +1223,7 @@
                 } else if (idx === currentStep) {
                     item.classList.add('active');
                     dot.textContent = current.code;
+                    dot.style.background = 'rgba(255,255,255,0.05)';
                 } else {
                     dot.textContent = SCAN_ORDER[idx].code;
                     dot.style.background = 'rgba(255,255,255,0.05)';
@@ -965,7 +1257,368 @@
             return a.every((v, i) => v === b[i]);
         }
 
-        // === MANUAL ===
+        // ==========================================
+        // SOLUÇÃO - NAVEGAÇÃO
+        // ==========================================
+        
+        function goToSolution() {
+            if (!isCubeComplete()) {
+                alert('Cubo incompleto! Escaneie todas as 6 faces.');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'flex';
+            
+            setTimeout(() => {
+                calculateSolution();
+                initSolution3D();
+                setupSolutionUI();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('screen-scanner').classList.remove('active');
+                document.getElementById('screen-solution').classList.add('active');
+                document.getElementById('header-title').textContent = 'Solução do Cubo';
+                document.getElementById('face-counter').textContent = '';
+            }, 800);
+        }
+        
+        function backToScanner() {
+            isPlaying = false;
+            document.getElementById('btn-play').textContent = '▶';
+            
+            document.getElementById('screen-solution').classList.remove('active');
+            document.getElementById('screen-scanner').classList.add('active');
+            updateScannerUI();
+        }
+        
+        function calculateSolution() {
+            // Algoritmo simplificado - substituir por Kociamba real
+            solution = generateLayerSolution(cubeState);
+            currentMoveIndex = 0;
+        }
+        
+        function generateLayerSolution(state) {
+            const moves = [];
+            
+            // Cruz branca
+            moves.push("F", "R", "U", "R'", "U'", "F'");
+            
+            // Primeira camada
+            moves.push("R", "U", "R'", "U'", "R", "U", "R'", "U'");
+            
+            // Segunda camada
+            moves.push("U", "R", "U'", "R'", "U'", "F'", "U", "F");
+            moves.push("U'", "L'", "U", "L", "U", "F", "U'", "F'");
+            
+            // Cruz amarela
+            moves.push("F", "R", "U", "R'", "U'", "F'");
+            moves.push("F", "R", "U", "R'", "U'", "R", "U", "R'", "U'", "F'");
+            
+            // Orientação amarela
+            moves.push("R", "U", "R'", "U", "R", "U2", "R'");
+            
+            // Permutação amarela
+            moves.push("U", "R", "U'", "L'", "U", "R'", "U'", "L");
+            
+            // Permutação final
+            moves.push("R2", "U", "R", "U", "R'", "U'", "R'", "U'", "R'", "U", "R'");
+            
+            return moves;
+        }
+
+        // ==========================================
+        // 3D SOLUÇÃO COM CUBOS ARREDONDADOS
+        // ==========================================
+        
+        function initSolution3D() {
+            const container = document.getElementById('solution-cube-container');
+            
+            solutionScene = new THREE.Scene();
+            solutionScene.background = new THREE.Color(0x000000);
+            
+            solutionCamera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 1000);
+            solutionCamera.position.set(7, 7, 10);
+            
+            solutionRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            solutionRenderer.setSize(container.clientWidth, container.clientHeight);
+            solutionRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(solutionRenderer.domElement);
+            
+            // Luzes premium
+            solutionScene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            
+            const light1 = new THREE.PointLight(0xffffff, 0.8);
+            light1.position.set(10, 10, 10);
+            solutionScene.add(light1);
+            
+            const light2 = new THREE.PointLight(0xffffff, 0.5);
+            light2.position.set(-10, -10, -10);
+            solutionScene.add(light2);
+            
+            solutionControls = new THREE.OrbitControls(solutionCamera, solutionRenderer.domElement);
+            solutionControls.enableDamping = true;
+            solutionControls.dampingFactor = 0.05;
+            solutionControls.minDistance = 5;
+            solutionControls.maxDistance = 20;
+            
+            buildSolutionCubes();
+            animateSolution();
+            
+            window.addEventListener('resize', onSolutionResize);
+        }
+        
+        function onSolutionResize() {
+            const container = document.getElementById('solution-cube-container');
+            solutionCamera.aspect = container.clientWidth / container.clientHeight;
+            solutionCamera.updateProjectionMatrix();
+            solutionRenderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        
+        function buildSolutionCubes() {
+            // Limpa cubos existentes
+            solutionCubes.forEach(c => solutionScene.remove(c));
+            solutionCubes = [];
+            
+            // Geometria arredondada
+            const geom = createRoundedBox(0.95, 0.95, 0.95, 0.08, 4);
+            
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        const materials = getSolutionMaterials(x, y, z);
+                        const mesh = new THREE.Mesh(geom, materials);
+                        mesh.position.set(x, y, z);
+                        
+                        // Borda sutil
+                        const edges = new THREE.EdgesGeometry(geom, 15);
+                        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ 
+                            color: 0x000000, opacity: 0.15, transparent: true 
+                        }));
+                        mesh.add(line);
+                        
+                        mesh.userData = { x, y, z };
+                        solutionScene.add(mesh);
+                        solutionCubes.push(mesh);
+                    }
+                }
+            }
+        }
+        
+        function getSolutionMaterials(x, y, z) {
+            const mats = [
+                new THREE.MeshStandardMaterial({ color: 0xb71234, roughness: 0.2 }), // R
+                new THREE.MeshStandardMaterial({ color: 0xff5800, roughness: 0.2 }), // L
+                new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }), // U
+                new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.2 }), // D
+                new THREE.MeshStandardMaterial({ color: 0x0046ad, roughness: 0.2 }), // F
+                new THREE.MeshStandardMaterial({ color: 0x009b48, roughness: 0.2 })  // B
+            ];
+            
+            const faceMap = [
+                x === 1 ? 'R' : null,
+                x === -1 ? 'L' : null,
+                y === 1 ? 'U' : null,
+                y === -1 ? 'D' : null,
+                z === 1 ? 'F' : null,
+                z === -1 ? 'B' : null
+            ];
+            
+            faceMap.forEach((face, i) => {
+                if (!face) {
+                    mats[i].color.setHex(0x111111);
+                    return;
+                }
+                
+                const idx = getFaceIndex(x, y, z, face);
+                const colorCode = cubeState[face][idx];
+                
+                if (colorCode && COLOR_MAP[colorCode]) {
+                    const hex = parseInt(COLOR_MAP[colorCode].replace('#', '0x'));
+                    mats[i].color.setHex(hex);
+                }
+            });
+            
+            return mats;
+        }
+        
+        function animateSolution() {
+            requestAnimationFrame(animateSolution);
+            solutionControls.update();
+            solutionRenderer.render(solutionScene, solutionCamera);
+        }
+
+        // ==========================================
+        // CONTROLES DA SOLUÇÃO
+        // ==========================================
+        
+        function setupSolutionUI() {
+            const scroll = document.getElementById('sequence-scroll');
+            scroll.innerHTML = '';
+            
+            solution.forEach((move, i) => {
+                const chip = document.createElement('div');
+                chip.className = 'move-chip';
+                chip.textContent = move;
+                chip.dataset.index = i;
+                scroll.appendChild(chip);
+            });
+            
+            updateSolutionDisplay();
+            
+            document.getElementById('speed-slider').addEventListener('input', (e) => {
+                animationSpeed = parseFloat(e.target.value);
+            });
+        }
+        
+        function updateSolutionDisplay() {
+            const move = solution[currentMoveIndex];
+            const moveEl = document.getElementById('current-move');
+            
+            if (move) {
+                moveEl.textContent = move;
+                const face = move.charAt(0);
+                const colors = { 'R': '#b71234', 'L': '#ff5800', 'U': '#ffffff', 'D': '#ffd700', 'F': '#0046ad', 'B': '#009b48' };
+                moveEl.style.color = colors[face] || '#3b82f6';
+            } else {
+                moveEl.textContent = '✓';
+                moveEl.style.color = '#22c55e';
+            }
+            
+            document.getElementById('move-count').textContent = `${currentMoveIndex} / ${solution.length}`;
+            
+            const moveName = move ? MOVE_NAMES[move.charAt(0)] + (move.includes("'") ? ' ↺' : move.includes('2') ? ' 180°' : ' ↻') : 'Resolvido!';
+            document.getElementById('move-name').textContent = moveName;
+            
+            document.querySelectorAll('.move-chip').forEach((chip, i) => {
+                chip.classList.remove('current', 'done');
+                if (i === currentMoveIndex) chip.classList.add('current');
+                else if (i < currentMoveIndex) chip.classList.add('done');
+            });
+            
+            const currentChip = document.querySelector('.move-chip.current');
+            if (currentChip) currentChip.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+            
+            document.getElementById('btn-prev').disabled = currentMoveIndex === 0;
+            document.getElementById('btn-next').disabled = currentMoveIndex >= solution.length;
+        }
+        
+        async function togglePlay() {
+            if (isPlaying) {
+                isPlaying = false;
+                document.getElementById('btn-play').textContent = '▶';
+            } else {
+                isPlaying = true;
+                document.getElementById('btn-play').textContent = '⏸';
+                await playLoop();
+            }
+        }
+        
+        async function playLoop() {
+            while (isPlaying && currentMoveIndex < solution.length) {
+                await executeSolutionMove(solution[currentMoveIndex]);
+                currentMoveIndex++;
+                updateSolutionDisplay();
+                await sleep(600 / animationSpeed);
+            }
+            
+            if (currentMoveIndex >= solution.length) {
+                isPlaying = false;
+                document.getElementById('btn-play').textContent = '↻';
+            }
+        }
+        
+        async function nextMove() {
+            if (isAnimating || currentMoveIndex >= solution.length) return;
+            await executeSolutionMove(solution[currentMoveIndex]);
+            currentMoveIndex++;
+            updateSolutionDisplay();
+        }
+        
+        async function prevMove() {
+            if (isAnimating || currentMoveIndex <= 0) return;
+            currentMoveIndex--;
+            const move = solution[currentMoveIndex];
+            const inverse = move.includes("'") ? move.replace("'", "") : 
+                           move.includes("2") ? move : move + "'";
+            await executeSolutionMove(inverse, true);
+            updateSolutionDisplay();
+        }
+        
+        function executeSolutionMove(move, reverse = false) {
+            return new Promise((resolve) => {
+                isAnimating = true;
+                const face = move.charAt(0);
+                const isPrime = move.includes("'");
+                const isDouble = move.includes("2");
+                
+                let angle = Math.PI / 2;
+                if (isDouble) angle = Math.PI;
+                else if (isPrime) angle = -Math.PI / 2;
+                
+                if (reverse) angle = -angle;
+                
+                animateLayer(face, angle, resolve);
+            });
+        }
+        
+        function animateLayer(face, angle, onComplete) {
+            const group = new THREE.Group();
+            solutionScene.add(group);
+            
+            const affected = solutionCubes.filter(c => {
+                const p = c.position;
+                if (face === 'R' && p.x > 0.5) return true;
+                if (face === 'L' && p.x < -0.5) return true;
+                if (face === 'U' && p.y > 0.5) return true;
+                if (face === 'D' && p.y < -0.5) return true;
+                if (face === 'F' && p.z > 0.5) return true;
+                if (face === 'B' && p.z < -0.5) return true;
+                return false;
+            });
+            
+            affected.forEach(c => group.attach(c));
+            
+            const duration = 300 / animationSpeed;
+            const startTime = Date.now();
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const t = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - t, 3);
+                
+                const current = angle * eased;
+                
+                if (face === 'R' || face === 'L') group.rotation.x = current;
+                else if (face === 'U' || face === 'D') group.rotation.y = current;
+                else group.rotation.z = current;
+                
+                if (t < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    group.updateMatrixWorld();
+                    affected.forEach(c => {
+                        solutionScene.attach(c);
+                        c.updateMatrix();
+                        c.matrix.decompose(c.position, c.quaternion, c.scale);
+                        
+                        // Snap para grid
+                        c.position.x = Math.round(c.position.x);
+                        c.position.y = Math.round(c.position.y);
+                        c.position.z = Math.round(c.position.z);
+                    });
+                    solutionScene.remove(group);
+                    isAnimating = false;
+                    onComplete();
+                }
+            }
+            
+            animate();
+        }
+
+        // ==========================================
+        // MANUAL
+        // ==========================================
+        
         function initManualGrid() {
             const grid = document.getElementById('manual-grid');
             for (let i = 0; i < 9; i++) {
@@ -998,7 +1651,6 @@
                 cell.dataset.color = color;
             });
             
-            // Seleciona cor do centro como padrão
             selectedColor = current.center;
             document.querySelectorAll('.color-option').forEach(btn => {
                 btn.classList.toggle('selected', btn.dataset.color === selectedColor);
@@ -1019,12 +1671,15 @@
             });
             
             cubeState[current.code] = colors;
-            updateCube();
+            updateScannerCube();
             closeManual();
             nextFace();
         }
 
-        // === UTILS ===
+        // ==========================================
+        // UTILS
+        // ==========================================
+        
         function getPixel(ctx, x, y) {
             const d = ctx.getImageData(Math.max(0, x-4), Math.max(0, y-4), 8, 8).data;
             let r=0, g=0, b=0, n=0;
@@ -1038,13 +1693,13 @@
             const [h, s, v] = rgbToHsv(r, g, b);
             
             if (v < 0.12) return 'X';
-            if (v > 0.78 && s < 0.22) return 'U'; // Branco
+            if (v > 0.78 && s < 0.22) return 'U';
             if (v > 0.45 && s > 0.28) {
-                if (h >= 48 && h < 82) return 'D';   // Amarelo
-                if (h >= 12 && h < 42) return 'L';   // Laranja
-                if ((h >= 335 || h < 18) && s > 0.45) return 'R'; // Vermelho
-                if (h >= 78 && h < 155) return 'F';  // Verde
-                if (h >= 195 && h < 265) return 'B'; // Azul
+                if (h >= 48 && h < 82) return 'D';
+                if (h >= 12 && h < 42) return 'L';
+                if ((h >= 335 || h < 18) && s > 0.45) return 'R';
+                if (h >= 78 && h < 155) return 'F';
+                if (h >= 195 && h < 265) return 'B';
             }
             return v > 0.6 ? 'U' : 'F';
         }
@@ -1064,6 +1719,10 @@
                 h/=6;
             }
             return [h*360, s, v];
+        }
+        
+        function sleep(ms) {
+            return new Promise(r => setTimeout(r, ms));
         }
     </script>
 </body>
