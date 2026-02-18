@@ -3,253 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Rubik AI Solver - Solução</title>
+    <title>Smart Rubik Capture</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.1/dist/cube.js"></script>
     <style>
-        :root { --accent: #00ff88; --bg: #111; }
-        html, body { position: fixed; width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg); font-family: sans-serif; color: white; }
+        :root { --error: #ff3b30; --success: #4cd964; --accent: #007aff; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
         
-        /* Telas */
-        .screen { display: none; width: 100%; height: 100%; flex-direction: column; }
-        .active { display: flex; }
-
-        /* Scanner Styles */
+        #scanner-view { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; }
         video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        #overlay { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); width: 260px; height: 260px; display: grid; grid-template-columns: repeat(3, 1fr); z-index: 10; border: 3px solid var(--accent); border-radius: 10px; pointer-events: none; }
-        .grid-cell { border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
-        .sensor-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; }
 
-        /* Solution Styles */
-        #canvas-container { flex: 1; width: 100%; }
-        #move-display { position: absolute; top: 60px; width: 100%; text-align: center; font-size: 2.5rem; font-weight: 900; color: var(--accent); text-shadow: 0 0 10px rgba(0,255,136,0.5); z-index: 100; }
-        
-        .controls { position: absolute; bottom: 0; width: 100%; padding-bottom: calc(30px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,0.9) 40%); text-align: center; z-index: 100; }
-        .instruction { margin-bottom: 15px; font-size: 1.1rem; }
-        .face-name { color: var(--accent); font-weight: bold; }
-        
-        button { padding: 18px 40px; border-radius: 15px; border: none; background: var(--accent); color: #000; font-weight: bold; font-size: 1rem; box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
-        button.secondary { background: #444; color: white; margin-right: 10px; }
-        
-        #mini-preview { position: absolute; top: 20px; right: 20px; width: 100px; height: 100px; background: rgba(0,0,0,0.6); border-radius: 12px; z-index: 50; }
+        /* Grade que muda de cor */
+        #overlay { 
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            width: 260px; height: 260px; display: grid; grid-template-columns: repeat(3, 1fr);
+            border: 5px solid var(--error); border-radius: 15px; z-index: 10;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        #overlay.valid { border-color: var(--success); box-shadow: 0 0 20px var(--success); }
+
+        .grid-cell { border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.5); }
+        .center-dot { width: 15px; height: 15px; border: 2px solid #fff; opacity: 1; }
+
+        /* Status e Instruções */
+        #status-bar { 
+            position: absolute; top: 0; width: 100%; padding: 40px 0 20px;
+            background: linear-gradient(rgba(0,0,0,0.8), transparent); color: white;
+            text-align: center; z-index: 20;
+        }
+        .timer-bar { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--success); width: 0%; transition: width 0.1s linear; }
+
+        #preview-pane { position: absolute; top: 20px; right: 20px; width: 100px; height: 100px; background: rgba(0,0,0,0.5); border-radius: 10px; z-index: 30; border: 1px solid #444; }
+
+        .btn-panel { position: absolute; bottom: 40px; width: 100%; text-align: center; z-index: 40; }
+        .confirm-btn { padding: 15px 40px; border-radius: 30px; border: none; background: white; color: black; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="scanner-screen" class="screen active">
-        <video id="camera" autoplay playsinline></video>
-        <div id="overlay">
-            <div class="grid-cell"><div class="sensor-dot"></div></div><div class="grid-cell"><div class="sensor-dot"></div></div><div class="grid-cell"><div class="sensor-dot"></div></div>
-            <div class="grid-cell"><div class="sensor-dot"></div></div><div class="grid-cell"><div class="sensor-dot"></div></div><div class="grid-cell"><div class="sensor-dot"></div></div>
-            <div class="grid-cell"><div class="sensor-dot"></div></div><div class="grid-cell"><div class="sensor-dot"></div></div><div class="grid-cell"><div class="sensor-dot"></div></div>
+    <div id="scanner-view">
+        <video id="webcam" autoplay playsinline></video>
+        
+        <div id="status-bar">
+            <div id="instruction">Alinhe a Face <b id="face-target">FRENTE (Verde)</b></div>
+            <div id="progress-text">Face 1 de 6</div>
+            <div class="timer-bar" id="timer"></div>
         </div>
-        <div id="mini-preview"></div>
-        <div class="controls">
-            <div class="instruction">Aponte a face: <span id="target-face-name" class="face-name">BRANCA</span></div>
-            <button onclick="captureFace()">CAPTURAR FACE</button>
-        </div>
-    </div>
 
-    <div id="solution-screen" class="screen">
-        <div id="move-display">CALCULANDO...</div>
-        <div id="canvas-container"></div>
-        <div class="controls">
-            <button class="secondary" onclick="stepMove(-1)">ANTERIOR</button>
-            <button onclick="stepMove(1)">PRÓXIMO PASSO</button>
+        <div id="overlay">
+            <div class="grid-cell"><div class="dot"></div></div><div class="grid-cell"><div class="dot"></div></div><div class="grid-cell"><div class="dot"></div></div>
+            <div class="grid-cell"><div class="dot"></div></div><div class="grid-cell"><div class="dot center-dot" id="center-sensor"></div></div><div class="grid-cell"><div class="dot"></div></div>
+            <div class="grid-cell"><div class="dot"></div></div><div class="grid-cell"><div class="dot"></div></div><div class="grid-cell"><div class="dot"></div></div>
+        </div>
+
+        <div id="preview-pane"></div>
+
+        <div class="btn-panel">
+            <button id="confirm-btn" class="confirm-btn" onclick="nextFace()">CONFIRMAR E CONTINUAR</button>
         </div>
     </div>
 
     <script>
-        // Configurações do Cubo
-        const faces = ['U', 'R', 'F', 'D', 'L', 'B'];
-        const faceNames = ["BRANCA (Topo)", "VERMELHA (Direita)", "VERDE (Frente)", "AMARELA (Base)", "LARANJA (Esquerda)", "AZUL (Trás)"];
-        let currentStep = 0;
-        let scanResult = {}; // Formato: { 'U': [cor, cor...], ... }
+        // Ordem: Frente (F), Direita (R), Trás (B), Esquerda (L), Topo (U), Base (D)
+        const sequence = [
+            { id: 'F', name: 'FRENTE (Verde)', color: [0, 155, 72], hex: 0x009b48 },
+            { id: 'R', name: 'DIREITA (Vermelho)', color: [183, 18, 52], hex: 0xb71234 },
+            { id: 'B', name: 'TRÁS (Azul)', color: [0, 70, 173], hex: 0x0046ad },
+            { id: 'L', name: 'ESQUERDA (Laranja)', color: [255, 88, 0], hex: 0xff5800 },
+            { id: 'U', name: 'TOPO (Branco)', color: [255, 255, 255], hex: 0xffffff },
+            { id: 'D', name: 'BASE (Amarelo)', color: [255, 215, 0], hex: 0xffd700 }
+        ];
 
-        // Three.js Globais
-        let scene, camera, renderer, cubeGroup, isAnimating = false;
-        let solutionMoves = [];
-        let currentMoveIndex = -1;
+        let currentIdx = 0;
+        let isValidating = false;
+        let captureTimer = null;
+        let lastCapturedColors = [];
 
-        // --- INICIALIZAÇÃO ---
-        window.onload = () => {
-            setupCamera();
-            init3D();
-            liveSensor();
-        };
+        // Three.js Preview
+        let scene, camera, renderer, miniCube;
 
-        async function setupCamera() {
+        async function init() {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            document.getElementById('camera').srcObject = stream;
+            document.getElementById('webcam').srcObject = stream;
+            
+            init3D();
+            requestAnimationFrame(processFrame);
         }
 
         function init3D() {
-            // Reutilizando lógica de criação de cubo arredondado
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(6, 6, 8);
+            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10);
+            camera.position.set(2, 2, 2);
             camera.lookAt(0,0,0);
-
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            const sun = new THREE.DirectionalLight(0xffffff, 0.5);
-            sun.position.set(5,10,5);
-            scene.add(sun);
-
-            createCubeGroup();
-            animate();
+            renderer.setSize(100, 100);
+            document.getElementById('preview-pane').appendChild(renderer.domElement);
+            
+            const geo = new THREE.BoxGeometry(1, 1, 1);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            miniCube = new THREE.Mesh(geo, mat);
+            scene.add(miniCube);
+            scene.add(new THREE.AmbientLight(0xffffff, 1));
+            animate3D();
         }
 
-        function createCubeGroup() {
-            cubeGroup = new THREE.Group();
-            const geom = new THREE.BoxGeometry(0.95, 0.95, 0.95);
-            for(let x=-1; x<=1; x++){
-                for(let y=-1; y<=1; y++){
-                    for(let z=-1; z<=1; z++){
-                        const mats = Array(6).fill().map(() => new THREE.MeshStandardMaterial({color: 0x222222}));
-                        const mesh = new THREE.Mesh(geom, mats);
-                        mesh.position.set(x, y, z);
-                        mesh.userData = { initialPos: {x,y,z} };
-                        cubeGroup.add(mesh);
-                    }
-                }
-            }
-            scene.add(cubeGroup);
-        }
-
-        // --- LÓGICA DE CAPTURA ---
-        function liveSensor() {
-            // Atualiza os pontinhos do overlay (mesma lógica anterior)
-            const video = document.getElementById('camera');
-            if(video.readyState === video.HAVE_ENOUGH_DATA) {
+        function processFrame() {
+            const video = document.getElementById('webcam');
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 const canvas = document.createElement('canvas');
-                canvas.width = 100; canvas.height = 100; // Baixa res para performance
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, 100, 100);
-                // ... amostragem simplificada aqui ...
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+
+                // Analisa apenas o centro para validar
+                const overlay = document.getElementById('overlay').getBoundingClientRect();
+                const videoBox = video.getBoundingClientRect();
+                
+                const centerX = (overlay.left + overlay.width/2 - videoBox.left) * (canvas.width / videoBox.width);
+                const centerY = (overlay.top + overlay.height/2 - videoBox.top) * (canvas.height / videoBox.height);
+                
+                const pixel = ctx.getImageData(centerX, centerY, 1, 1).data;
+                const detectedColor = [pixel[0], pixel[1], pixel[2]];
+                
+                checkMatch(detectedColor, canvas, ctx);
             }
-            requestAnimationFrame(liveSensor);
+            requestAnimationFrame(processFrame);
         }
 
-        function captureFace() {
-            // Simulando captura de cores para o exemplo funcionar
-            // Em produção, usa a análise de pixel que fizemos antes
-            const dummyColors = Array(9).fill(0xffffff); 
-            scanResult[faces[currentStep]] = dummyColors;
-            
-            applyColorsToFace(faces[currentStep], dummyColors);
+        function checkMatch(rgb, canvas, ctx) {
+            const target = sequence[currentIdx].color;
+            // Distância Euclidiana de cor simplificada
+            const dist = Math.sqrt(
+                Math.pow(rgb[0] - target[0], 2) + 
+                Math.pow(rgb[1] - target[1], 2) + 
+                Math.pow(rgb[2] - target[2], 2)
+            );
 
-            currentStep++;
-            if(currentStep < faces.length) {
-                document.getElementById('target-face-name').innerText = faceNames[currentStep];
-                // Rotaciona o cubo para a próxima face
-                rotateCubeToFace(faces[currentStep]);
-            } else {
-                startSolver();
-            }
-        }
+            const overlay = document.getElementById('overlay');
+            const timerBar = document.getElementById('timer');
 
-        function applyColorsToFace(face, colors) {
-            // Pintar as faces dos cubinhos no Three.js
-            cubeGroup.children.forEach(c => {
-                const p = c.position;
-                if(face === 'U' && Math.round(p.y) === 1) c.material[2].color.set(0xffffff);
-                if(face === 'D' && Math.round(p.y) === -1) c.material[3].color.set(0xffff00);
-                if(face === 'F' && Math.round(p.z) === 1) c.material[4].color.set(0x00ff00);
-                if(face === 'B' && Math.round(p.z) === -1) c.material[5].color.set(0x0000ff);
-                if(face === 'R' && Math.round(p.x) === 1) c.material[0].color.set(0xff0000);
-                if(face === 'L' && Math.round(p.x) === -1) c.material[1].color.set(0xffa500);
-            });
-        }
-
-        // --- ENGINE DE SOLUÇÃO ---
-        function startSolver() {
-            document.getElementById('scanner-screen').classList.remove('active');
-            document.getElementById('solution-screen').classList.add('active');
-            
-            // Centraliza o cubo para a solução
-            cubeGroup.rotation.set(0.3, -0.5, 0);
-
-            // 1. Inicializa Kociemba
-            Cube.initSolver();
-            // 2. Cria string de estado (Exemplo estático para teste, você deve gerar a string real)
-            const cube = Cube.random(); // Aqui entra o resultado do seu scan
-            const solution = cube.solve();
-            solutionMoves = solution.split(" ");
-            
-            document.getElementById('move-display').innerText = solutionMoves[0];
-        }
-
-        function stepMove(dir) {
-            if(isAnimating) return;
-            if(dir === 1 && currentMoveIndex < solutionMoves.length - 1) {
-                currentMoveIndex++;
-                animateMove(solutionMoves[currentMoveIndex]);
-            }
-            document.getElementById('move-display').innerText = solutionMoves[currentMoveIndex+1] || "FIM";
-        }
-
-        function animateMove(moveStr) {
-            isAnimating = true;
-            const face = moveStr[0]; // U, R, F...
-            const modifier = moveStr[1] || ""; // ', 2 ou vazio
-            
-            let angle = Math.PI / 2;
-            if(modifier === "'") angle = -Math.PI / 2;
-            if(modifier === "2") angle = Math.PI;
-
-            const axisMap = { 'U': 'y', 'D': 'y', 'R': 'x', 'L': 'x', 'F': 'z', 'B': 'z' };
-            const layerMap = { 'U': 1, 'D': -1, 'R': 1, 'L': -1, 'F': 1, 'B': -1 };
-            
-            const axis = axisMap[face];
-            const layerValue = layerMap[face];
-
-            const group = new THREE.Group();
-            scene.add(group);
-
-            const toRotate = cubeGroup.children.filter(c => Math.round(c.position[axis]) === layerValue);
-            toRotate.forEach(c => group.add(c));
-
-            let currentAngle = 0;
-            const speed = 0.1 * (angle > 0 ? 1 : -1);
-
-            function rot() {
-                currentAngle += speed;
-                if(Math.abs(currentAngle) >= Math.abs(angle)) {
-                    group.rotation[axis] = angle;
-                    // Finaliza e limpa grupo
-                    const tempArr = [...group.children];
-                    tempArr.forEach(c => {
-                        c.getWorldPosition(c.position);
-                        c.getWorldQuaternion(c.quaternion);
-                        c.position.x = Math.round(c.position.x);
-                        c.position.y = Math.round(c.position.y);
-                        c.position.z = Math.round(c.position.z);
-                        cubeGroup.add(c);
-                    });
-                    scene.remove(group);
-                    isAnimating = false;
-                } else {
-                    group.rotation[axis] = currentAngle;
-                    requestAnimationFrame(rot);
+            if (dist < 80) { // Limiar de tolerância
+                if (!isValidating) {
+                    isValidating = true;
+                    overlay.classList.add('valid');
+                    startAutoCapture(canvas, ctx);
                 }
+            } else {
+                isValidating = false;
+                overlay.classList.remove('valid');
+                clearTimeout(captureTimer);
+                timerBar.style.width = '0%';
             }
-            rot();
         }
 
-        function rotateCubeToFace(face) {
-            // Animação simples de rotação da câmera ou cubo para a próxima face no scan
-            const rots = { 'U': [0.5,0.5], 'R': [0, -1.5], 'F': [0,0], 'D': [-1.5,0], 'L': [0,1.5], 'B': [0,3.14] };
-            cubeGroup.rotation.set(rots[face][0], rots[face][1], 0);
+        function startAutoCapture(canvas, ctx) {
+            let start = Date.now();
+            const duration = 1000;
+            
+            const updateBar = () => {
+                if (!isValidating) return;
+                let elapsed = Date.now() - start;
+                document.getElementById('timer').style.width = (elapsed / duration * 100) + '%';
+                
+                if (elapsed < duration) {
+                    requestAnimationFrame(updateBar);
+                } else {
+                    performCapture();
+                }
+            };
+            updateBar();
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
+        function performCapture() {
+            // Vibração de feedback (se suportado)
+            if (navigator.vibrate) navigator.vibrate(50);
+            
+            // Aqui as cores seriam extraídas de todos os 9 pontos
+            // Para visualização, vamos pintar o miniCube com a cor da face detectada
+            miniCube.material.color.setHex(sequence[currentIdx].hex);
+            
+            document.getElementById('confirm-btn').style.display = 'inline-block';
+            document.getElementById('overlay').style.borderColor = 'gold';
+            isValidating = false; 
+        }
+
+        function nextFace() {
+            currentIdx++;
+            if (currentIdx < sequence.length) {
+                document.getElementById('face-target').innerText = sequence[currentIdx].name;
+                document.getElementById('progress-text').innerText = `Face ${currentIdx + 1} de 6`;
+                document.getElementById('confirm-btn').style.display = 'none';
+                document.getElementById('timer').style.width = '0%';
+                miniCube.material.color.setHex(0x333333); // Reseta preview
+            } else {
+                alert("Todas as faces capturadas com sucesso!");
+            }
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            miniCube.rotation.y += 0.01;
             renderer.render(scene, camera);
         }
+
+        window.onload = init;
     </script>
 </body>
 </html>
