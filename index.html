@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Rubik Solver - Captura</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         
@@ -22,27 +23,46 @@
             position: fixed;
             top: env(safe-area-inset-top);
             left: 0; right: 0;
-            height: 44px;
+            height: 50px;
             background: rgba(0,0,0,0.95);
             backdrop-filter: blur(20px);
             z-index: 100;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: center;
             padding: 0 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         
-        .camera-section {
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        .header-subtitle {
+            position: absolute;
+            right: 16px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        /* Container principal */
+        .main-container {
             position: fixed;
-            top: calc(env(safe-area-inset-top) + 44px);
+            top: calc(env(safe-area-inset-top) + 50px);
             left: 0; right: 0;
-            height: 35vh;
-            min-height: 250px;
-            background: #1a1a1a;
+            bottom: env(safe-area-inset-bottom);
             display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
+            flex-direction: column;
+        }
+        
+        /* Área da câmera com cubo 3D overlay */
+        .camera-area {
+            position: relative;
+            flex: 1;
+            background: #0a0a0a;
+            overflow: hidden;
         }
         
         #video {
@@ -51,7 +71,6 @@
             width: 100%; height: 100%;
             object-fit: cover;
             display: none;
-            z-index: 1;
         }
         
         .camera-placeholder {
@@ -61,369 +80,458 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 16px;
+            gap: 20px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
             z-index: 5;
-            background: #1a1a1a;
         }
         
-        .start-camera-btn {
-            width: 72px; height: 72px;
+        .start-btn {
+            width: 80px; height: 80px;
             border-radius: 50%;
             background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
             border: 4px solid rgba(255,255,255,0.3);
             color: white;
-            font-size: 28px;
+            font-size: 32px;
             cursor: pointer;
-            box-shadow: 0 6px 25px rgba(34,197,94,0.5);
+            box-shadow: 0 8px 30px rgba(34,197,94,0.5);
+            animation: pulse-btn 2s infinite;
         }
         
+        @keyframes pulse-btn {
+            0%, 100% { transform: scale(1); box-shadow: 0 8px 30px rgba(34,197,94,0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 12px 40px rgba(34,197,94,0.7); }
+        }
+        
+        /* Grade de scan centralizada */
         .scan-overlay {
             position: absolute;
             inset: 0;
-            pointer-events: none;
             display: none;
-            z-index: 10;
+            pointer-events: none;
         }
-        
-        .face-progress {
-            position: absolute;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 6px;
-            z-index: 20;
-        }
-        
-        .face-dot {
-            width: 10px; height: 10px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.3);
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-        
-        .face-dot.active { background: #3b82f6; transform: scale(1.2); }
-        .face-dot.done { background: #22c55e; border-color: #22c55e; }
         
         .scan-grid {
             position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: min(180px, 45vw);
-            height: min(180px, 45vw);
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 3px;
-            padding: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 12px;
-        }
-        
-        .scan-cell {
-            border: 2px solid rgba(255,255,255,0.6);
-            background: rgba(255,255,255,0.05);
-            border-radius: 6px;
-        }
-        
-        .scan-cell.center { border: 3px solid #ef4444; background: rgba(239,68,68,0.2); }
-        .scan-cell.center.detected { border-color: #22c55e; background: rgba(34,197,94,0.3); }
-        
-        .scan-status {
-            position: absolute;
-            bottom: 80px;
+            top: 45%;
             left: 50%;
-            transform: translateX(-50%);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
-            background: rgba(0,0,0,0.8);
-            z-index: 20;
-            white-space: nowrap;
-        }
-        
-        .scan-status.detected { background: #22c55e; }
-        
-        .shutter-container {
-            position: absolute;
-            bottom: 15px;
-            left: 0; right: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            pointer-events: auto;
-            z-index: 20;
-        }
-        
-        .shutter-btn {
-            width: 56px; height: 56px;
-            border-radius: 50%;
-            border: 3px solid white;
-            background: transparent;
-            cursor: pointer;
-            position: relative;
-        }
-        
-        .shutter-btn::after {
-            content: '';
-            position: absolute;
-            inset: 3px;
-            border-radius: 50%;
-            background: white;
-        }
-        
-        .shutter-btn.auto-ready::after { background: #22c55e; }
-        .shutter-btn.captured::after { background: #3b82f6; }
-        
-        .upload-btn {
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-        }
-        
-        .editor-section {
-            position: fixed;
-            bottom: env(safe-area-inset-bottom);
-            left: 0; right: 0;
-            top: calc(env(safe-area-inset-top) + 44px + 35vh);
-            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            z-index: 50;
-        }
-        
-        .editor-main {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            width: 100%;
-            flex: 1;
-            justify-content: center;
-        }
-        
-        .nav-arrow {
-            width: 48px; height: 48px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-        }
-        
-        .nav-arrow:disabled { opacity: 0.2; }
-        
-        .face-preview {
-            width: 150px; height: 150px;
+            transform: translate(-50%, -50%);
+            width: min(240px, 60vw);
+            height: min(240px, 60vw);
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 4px;
             padding: 6px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .scan-cell {
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.05);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .scan-cell.detected {
+            border-color: #22c55e;
+            background: rgba(34,197,94,0.2);
+            box-shadow: 0 0 20px rgba(34,197,94,0.4);
+        }
+        
+        .scan-cell.stable {
+            animation: stable-flash 0.5s ease;
+        }
+        
+        @keyframes stable-flash {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(0.95); background: rgba(34,197,94,0.5); }
+        }
+        
+        /* Cubo 3D preview no canto */
+        .cube-preview-3d {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+            z-index: 20;
+            overflow: hidden;
+        }
+        
+        #cube-3d-mini {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Indicador de progresso lateral */
+        .progress-sidebar {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .progress-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0.4;
+            transition: all 0.3s;
+        }
+        
+        .progress-item.active {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .progress-item.done {
+            opacity: 0.8;
+        }
+        
+        .progress-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+        
+        .progress-item.active .progress-dot {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            box-shadow: 0 0 10px #3b82f6;
+        }
+        
+        .progress-item.done .progress-dot {
+            background: #22c55e;
+            border-color: #22c55e;
+        }
+        
+        .progress-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        /* Status e timer */
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 20;
+        }
+        
+        .status-text {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+        
+        .stability-timer {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+        
+        .stability-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        /* Botões de ação */
+        .action-buttons {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .action-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .action-btn.primary {
+            background: #22c55e;
+            width: auto;
+            padding: 0 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 700;
+            display: none;
+        }
+        
+        /* Tela de confirmação (apenas se necessário) */
+        .confirm-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 50;
+            padding: 20px;
+        }
+        
+        .confirm-grid {
+            width: 200px;
+            height: 200px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            padding: 8px;
             background: #2a2a2a;
             border-radius: 12px;
         }
         
-        .face-cell {
+        .confirm-cell {
             border-radius: 8px;
-            cursor: pointer;
-            border: 2px solid transparent;
-        }
-        
-        .face-cell.selected {
-            transform: scale(0.9);
-            border-color: #3b82f6;
-            box-shadow: 0 0 15px rgba(59,130,246,0.5);
-        }
-        
-        .face-status {
-            font-size: 12px;
-            padding: 6px 12px;
-            border-radius: 12px;
-            background: rgba(255,255,255,0.1);
-            color: rgba(255,255,255,0.7);
-            margin-top: 8px;
-        }
-        
-        .face-status.locked { background: rgba(34,197,94,0.2); color: #22c55e; }
-        
-        .color-palette {
-            display: flex;
-            gap: 10px;
-            margin: 16px 0;
-            padding: 10px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 30px;
-        }
-        
-        .color-btn {
-            width: 36px; height: 36px;
-            border-radius: 50%;
-            border: 2px solid transparent;
-            cursor: pointer;
-        }
-        
-        .color-btn.active { border-color: white; transform: scale(1.15); }
-        
-        .action-btn {
-            width: 100%;
-            max-width: 300px;
-            height: 52px;
-            border-radius: 26px;
-            border: none;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            margin-top: auto;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-        }
-        
-        .action-btn.primary {
-            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-            color: white;
-            box-shadow: 0 4px 20px rgba(34,197,94,0.4);
-        }
-        
-        .action-btn.solution {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            color: white;
-            box-shadow: 0 4px 20px rgba(59,130,246,0.4);
         }
         
         input[type="file"] { display: none; }
     </style>
 </head>
 <body>
+
     <div class="app-header">
-        <div id="header-title">Face Branca (Up)</div>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-            <span>Auto</span>
-            <div class="toggle-switch" id="auto-toggle" onclick="toggleAuto()" style="width: 44px; height: 24px; background: rgba(255,255,255,0.2); border-radius: 12px; position: relative; cursor: pointer;">
-                <div style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.3s;" id="toggle-knob"></div>
-            </div>
-        </div>
+        <div class="header-title" id="header-title">Mostre a face VERDE</div>
+        <div class="header-subtitle" id="face-counter">1/6</div>
     </div>
 
-    <div class="camera-section">
-        <video id="video" autoplay playsinline muted></video>
-        
-        <div class="camera-placeholder" id="camera-placeholder">
-            <button class="start-camera-btn" onclick="startCamera()">📷</button>
-            <p style="color: rgba(255,255,255,0.7); font-size: 14px;">Toque para iniciar a câmera</p>
-        </div>
-        
-        <div class="scan-overlay" id="scan-overlay">
-            <div class="face-progress" id="face-progress">
-                <div class="face-dot active"></div>
-                <div class="face-dot"></div>
-                <div class="face-dot"></div>
-                <div class="face-dot"></div>
-                <div class="face-dot"></div>
-                <div class="face-dot"></div>
+    <div class="main-container">
+        <div class="camera-area">
+            <video id="video" autoplay playsinline muted></video>
+            
+            <div class="camera-placeholder" id="camera-placeholder">
+                <button class="start-btn" onclick="startCamera()">📷</button>
+                <p style="color: rgba(255,255,255,0.7); font-size: 14px;">Toque para iniciar</p>
             </div>
             
-            <div class="scan-status" id="scan-status">Centralize o cubo</div>
-            
-            <div class="scan-grid" id="scan-grid">
-                <div class="scan-cell" id="cell-0"></div>
-                <div class="scan-cell" id="cell-1"></div>
-                <div class="scan-cell" id="cell-2"></div>
-                <div class="scan-cell" id="cell-3"></div>
-                <div class="scan-cell center" id="cell-4"></div>
-                <div class="scan-cell" id="cell-5"></div>
-                <div class="scan-cell" id="cell-6"></div>
-                <div class="scan-cell" id="cell-7"></div>
-                <div class="scan-cell" id="cell-8"></div>
+            <div class="scan-overlay" id="scan-overlay">
+                <!-- Progresso lateral -->
+                <div class="progress-sidebar" id="progress-sidebar">
+                    <div class="progress-item active" data-face="F">
+                        <div class="progress-dot" style="background: #00FF00;"></div>
+                        <span class="progress-label">Frente</span>
+                    </div>
+                    <div class="progress-item" data-face="R">
+                        <div class="progress-dot" style="background: #FF0000;"></div>
+                        <span class="progress-label">Direita</span>
+                    </div>
+                    <div class="progress-item" data-face="B">
+                        <div class="progress-dot" style="background: #0000FF;"></div>
+                        <span class="progress-label">Trás</span>
+                    </div>
+                    <div class="progress-item" data-face="L">
+                        <div class="progress-dot" style="background: #FFA500;"></div>
+                        <span class="progress-label">Esquerda</span>
+                    </div>
+                    <div class="progress-item" data-face="U">
+                        <div class="progress-dot" style="background: #FFFFFF;"></div>
+                        <span class="progress-label">Topo</span>
+                    </div>
+                    <div class="progress-item" data-face="D">
+                        <div class="progress-dot" style="background: #FFFF00;"></div>
+                        <span class="progress-label">Base</span>
+                    </div>
+                </div>
+                
+                <!-- Status -->
+                <div class="status-bar">
+                    <div class="status-text" id="status-text">Centralize o cubo na grade</div>
+                    <div class="stability-timer">
+                        <div class="stability-fill" id="stability-fill"></div>
+                    </div>
+                </div>
+                
+                <!-- Grade de scan -->
+                <div class="scan-grid" id="scan-grid">
+                    <div class="scan-cell" id="scan-0"></div>
+                    <div class="scan-cell" id="scan-1"></div>
+                    <div class="scan-cell" id="scan-2"></div>
+                    <div class="scan-cell" id="scan-3"></div>
+                    <div class="scan-cell" id="scan-4"></div>
+                    <div class="scan-cell" id="scan-5"></div>
+                    <div class="scan-cell" id="scan-6"></div>
+                    <div class="scan-cell" id="scan-7"></div>
+                    <div class="scan-cell" id="scan-8"></div>
+                </div>
+                
+                <!-- Cubo 3D preview -->
+                <div class="cube-preview-3d">
+                    <div id="cube-3d-mini"></div>
+                </div>
+                
+                <!-- Botões -->
+                <div class="action-buttons">
+                    <button class="action-btn" onclick="document.getElementById('file-input').click()">📁</button>
+                    <button class="action-btn" onclick="skipFace()" id="skip-btn">⏭</button>
+                    <button class="action-btn primary" onclick="goToSolution()" id="solution-btn">Ver Solução</button>
+                </div>
             </div>
             
-            <div class="shutter-container">
-                <button class="upload-btn" onclick="document.getElementById('file-input').click()">📁</button>
-                <button class="shutter-btn" id="shutter-btn" onclick="captureFace()"></button>
+            <input type="file" id="file-input" accept="image/*" capture="environment">
+            
+            <!-- Tela de confirmação manual -->
+            <div class="confirm-screen" id="confirm-screen">
+                <h3>Está correto?</h3>
+                <div class="confirm-grid" id="confirm-grid"></div>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="retryCapture()" style="padding: 12px 24px; border-radius: 20px; border: none; background: #ef4444; color: white; font-weight: 600;">🔄 Tentar de novo</button>
+                    <button onclick="confirmCapture()" style="padding: 12px 24px; border-radius: 20px; border: none; background: #22c55e; color: white; font-weight: 600;">✓ Confirmar</button>
+                </div>
             </div>
         </div>
-        
-        <input type="file" id="file-input" accept="image/*" capture="environment">
-    </div>
-
-    <div class="editor-section">
-        <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1px;">
-            Toque nas cores para editar
-        </div>
-        
-        <div class="editor-main">
-            <button class="nav-arrow" id="arrow-prev" onclick="prevFace()" disabled>←</button>
-            
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <div class="face-preview" id="face-preview"></div>
-                <div class="face-status" id="face-status">Aguardando captura...</div>
-            </div>
-            
-            <button class="nav-arrow" id="arrow-next" onclick="nextFace()">→</button>
-        </div>
-        
-        <div class="color-palette" id="color-palette"></div>
-        
-        <button class="action-btn primary" id="action-btn" onclick="handleAction()">
-            Capturar Face
-        </button>
     </div>
 
     <script>
-        const FACES = [
-            { code: 'U', name: 'Branca', color: '#FFFFFF', bg: '#f0f0f0' },
-            { code: 'R', name: 'Vermelha', color: '#FF0000', bg: '#ff4444' },
-            { code: 'F', name: 'Verde', color: '#00FF00', bg: '#44ff44' },
-            { code: 'D', name: 'Amarela', color: '#FFFF00', bg: '#ffff44' },
-            { code: 'L', name: 'Laranja', color: '#FFA500', bg: '#ffb347' },
-            { code: 'B', name: 'Azul', color: '#0000FF', bg: '#4444ff' }
+        // Ordem de scan: F → R → B → L → U → D
+        const SCAN_ORDER = [
+            { code: 'F', name: 'Frente', color: '#00FF00', center: 'F' },
+            { code: 'R', name: 'Direita', color: '#FF0000', center: 'R' },
+            { code: 'B', name: 'Trás', color: '#0000FF', center: 'B' },
+            { code: 'L', name: 'Esquerda', color: '#FFA500', center: 'L' },
+            { code: 'U', name: 'Topo', color: '#FFFFFF', center: 'U' },
+            { code: 'D', name: 'Base', color: '#FFFF00', center: 'D' }
         ];
         
-        let currentFaceIdx = 0;
-        let isAutoScan = false;
-        let isScanning = false;
-        let isFaceCaptured = false;
+        const COLOR_MAP = {
+            'U': '#FFFFFF', 'R': '#FF0000', 'F': '#00FF00',
+            'D': '#FFFF00', 'L': '#FFA500', 'B': '#0000FF'
+        };
         
+        let currentStep = 0;
+        let isScanning = false;
         let cubeState = {
             U: Array(9).fill(null), R: Array(9).fill(null), F: Array(9).fill(null),
             D: Array(9).fill(null), L: Array(9).fill(null), B: Array(9).fill(null)
         };
         
-        let detectedColors = Array(9).fill('U');
-        let selectedCell = 4;
+        // Sistema de estabilidade
+        let lastColors = null;
+        let stabilityStart = null;
+        const STABILITY_TIME = 2000; // 2 segundos
+        let isStable = false;
+        
+        // Three.js para preview
+        let scene, camera, renderer, cubeGroup;
+        let miniScene, miniCamera, miniRenderer, miniCube;
         
         window.onload = () => {
-            initEditor();
+            initMiniCube();
             updateUI();
-            document.getElementById('file-input').addEventListener('change', handleFile);
         };
         
-        function initEditor() {
-            const preview = document.getElementById('face-preview');
-            for (let i = 0; i < 9; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'face-cell';
-                cell.onclick = () => selectCell(i);
-                preview.appendChild(cell);
-            }
+        function initMiniCube() {
+            const container = document.getElementById('cube-3d-mini');
             
-            const palette = document.getElementById('color-palette');
-            FACES.forEach(f => {
-                const btn = document.createElement('div');
-                btn.className = 'color-btn';
-                btn.style.background = f.color;
-                btn.onclick = () => applyColor(f.code);
-                palette.appendChild(btn);
+            miniScene = new THREE.Scene();
+            miniScene.background = new THREE.Color(0x000000);
+            
+            miniCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+            miniCamera.position.set(3, 3, 4);
+            miniCamera.lookAt(0, 0, 0);
+            
+            miniRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            miniRenderer.setSize(120, 120);
+            miniRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(miniRenderer.domElement);
+            
+            miniScene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+            dir.position.set(2, 3, 2);
+            miniScene.add(dir);
+            
+            buildMiniCube();
+            animateMini();
+        }
+        
+        function buildMiniCube() {
+            if (miniCube) miniScene.remove(miniCube);
+            miniCube = new THREE.Group();
+            
+            const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+            const colors = { 'U': 0x333333, 'R': 0x333333, 'F': 0x333333, 'D': 0x333333, 'L': 0x333333, 'B': 0x333333 };
+            
+            // Atualiza com cores já capturadas
+            Object.keys(cubeState).forEach(face => {
+                if (cubeState[face][0]) {
+                    colors[face] = parseInt(COLOR_MAP[face].replace('#', '0x'));
+                }
             });
             
-            selectCell(4);
-            loadFace(0);
+            // Destaca face atual
+            const current = SCAN_ORDER[currentStep];
+            if (current && !cubeState[current.code][0]) {
+                colors[current.code] = parseInt(current.color.replace('#', '0x'));
+            }
+            
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        if (x === 0 && y === 0 && z === 0) continue;
+                        
+                        const materials = [
+                            new THREE.MeshLambertMaterial({ color: x === 1 ? colors.R : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: x === -1 ? colors.L : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: y === 1 ? colors.U : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: y === -1 ? colors.D : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: z === 1 ? colors.F : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: z === -1 ? colors.B : 0x111111 }),
+                        ];
+                        
+                        const cubie = new THREE.Mesh(geometry, materials);
+                        cubie.position.set(x, y, z);
+                        miniCube.add(cubie);
+                    }
+                }
+            }
+            
+            miniScene.add(miniCube);
+            
+            // Rotação para mostrar face atual
+            if (current) {
+                const rot = { F: [0,0], R: [0, -Math.PI/2], B: [0, Math.PI], L: [0, Math.PI/2], U: [-Math.PI/2, 0], D: [Math.PI/2, 0] }[current.code];
+                miniCube.rotation.x = rot[0];
+                miniCube.rotation.y = rot[1];
+            }
+        }
+        
+        function animateMini() {
+            requestAnimationFrame(animateMini);
+            if (miniCube) {
+                miniCube.rotation.y += 0.002; // Rotação lenta contínua
+            }
+            miniRenderer.render(miniScene, miniCamera);
         }
         
         async function startCamera() {
@@ -440,15 +548,16 @@
                 document.getElementById('scan-overlay').style.display = 'block';
                 
                 isScanning = true;
-                isFaceCaptured = false;
+                resetStability();
                 scanLoop();
+                
             } catch (e) {
                 alert('Câmera indisponível. Use 📁');
             }
         }
         
         function scanLoop() {
-            if (!isScanning || isFaceCaptured) return;
+            if (!isScanning || currentStep >= 6) return;
             
             const video = document.getElementById('video');
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -457,14 +566,16 @@
                 canvas.height = video.videoHeight;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0);
+                
                 analyzeFrame(ctx, canvas.width, canvas.height);
             }
+            
             requestAnimationFrame(scanLoop);
         }
         
         function analyzeFrame(ctx, w, h) {
             const cx = w / 2, cy = h / 2;
-            const size = Math.min(w, h) * 0.5;
+            const size = Math.min(w, h) * 0.55;
             const cellSize = size / 3;
             
             const colors = [];
@@ -477,251 +588,159 @@
                 }
             }
             
-            detectedColors = colors;
-            updateScanGrid(colors);
-            
+            // Verifica se centro está correto
+            const current = SCAN_ORDER[currentStep];
             const centerColor = colors[4];
-            const expected = FACES[currentFaceIdx].code;
-            const match = (centerColor === expected);
+            const isCorrectCenter = (centerColor === current.center);
             
-            const centerCell = document.getElementById('cell-4');
-            const status = document.getElementById('scan-status');
-            const shutter = document.getElementById('shutter-btn');
+            // Atualiza visual da grade
+            updateScanGrid(colors, isCorrectCenter);
             
-            if (match) {
-                centerCell.classList.add('detected');
-                status.textContent = '✓ Pronto! Toque para capturar';
-                status.classList.add('detected');
-                shutter.classList.add('auto-ready');
-                updateEditorPreview(colors);
-            } else {
-                centerCell.classList.remove('detected');
-                status.textContent = `Procure: ${FACES[currentFaceIdx].name}`;
-                status.classList.remove('detected');
-                shutter.classList.remove('auto-ready');
-            }
-        }
-        
-        function updateScanGrid(colors) {
-            colors.forEach((code, i) => {
-                const cell = document.getElementById(`cell-${i}`);
-                if (cell && i !== 4) {
-                    const face = FACES.find(f => f.code === code);
-                    cell.style.background = face ? face.bg : '';
-                    cell.style.opacity = '0.6';
-                }
-            });
-        }
-        
-        function updateEditorPreview(colors) {
-            document.querySelectorAll('.face-cell').forEach((c, i) => {
-                const face = FACES.find(f => f.code === colors[i]);
-                c.style.background = face ? face.color : '#334155';
-            });
-        }
-        
-        function captureFace() {
-            if (isFaceCaptured) return;
-            
-            if (detectedColors[4] !== FACES[currentFaceIdx].code) {
-                navigator.vibrate?.(200);
+            if (!isCorrectCenter) {
+                document.getElementById('status-text').textContent = `Ops! Centro é ${colorName(centerColor)}, precisa ser ${current.name}`;
+                document.getElementById('status-text').style.color = '#ef4444';
+                resetStability();
                 return;
             }
             
-            const code = FACES[currentFaceIdx].code;
-            cubeState[code] = [...detectedColors];
-            isFaceCaptured = true;
+            document.getElementById('status-text').textContent = 'Perfeito! Mantenha estável...';
+            document.getElementById('status-text').style.color = '#22c55e';
             
-            document.getElementById('shutter-btn').classList.add('captured');
-            document.getElementById('scan-status').textContent = '✓ Face salva!';
+            // Sistema de estabilidade
+            checkStability(colors);
+        }
+        
+        function checkStability(colors) {
+            const now = Date.now();
+            
+            if (!lastColors || !colorsEqual(colors, lastColors)) {
+                lastColors = [...colors];
+                stabilityStart = now;
+                isStable = false;
+                updateStabilityBar(0);
+                return;
+            }
+            
+            const elapsed = now - stabilityStart;
+            const progress = Math.min(elapsed / STABILITY_TIME, 1);
+            updateStabilityBar(progress * 100);
+            
+            if (elapsed >= STABILITY_TIME && !isStable) {
+                isStable = true;
+                onStableDetection(colors);
+            }
+        }
+        
+        function onStableDetection(colors) {
+            // Flash visual
+            document.querySelectorAll('.scan-cell').forEach(cell => {
+                cell.classList.add('stable');
+                setTimeout(() => cell.classList.remove('stable'), 500);
+            });
+            
+            // Salva automaticamente
+            const current = SCAN_ORDER[currentStep];
+            cubeState[current.code] = [...colors];
+            
+            // Feedback
             navigator.vibrate?.([50, 100, 50]);
             
-            updateUI();
+            // Atualiza cubo 3D
+            buildMiniCube();
             
-            if (isAutoScan && currentFaceIdx < 5) {
-                setTimeout(() => nextFace(), 800);
-            }
-        }
-        
-        function handleFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                const colors = extractColors(ctx, canvas.width, canvas.height);
-                detectedColors = colors;
-                updateEditorPreview(colors);
-                
-                if (colors[4] === FACES[currentFaceIdx].code) {
-                    setTimeout(() => captureFace(), 500);
-                }
-            };
-            img.src = URL.createObjectURL(file);
-        }
-        
-        function extractColors(ctx, w, h) {
-            const cx = w / 2, cy = h / 2;
-            const size = Math.min(w, h) * 0.6;
-            const cell = size / 3;
-            
-            const colors = [];
-            for (let r = 0; r < 3; r++) {
-                for (let c = 0; c < 3; c++) {
-                    const x = cx - size/2 + c * cell + cell/2;
-                    const y = cy - size/2 + r * cell + cell/2;
-                    const p = getPixel(ctx, x, y);
-                    colors.push(rgbToCode(p.r, p.g, p.b));
-                }
-            }
-            return colors;
-        }
-        
-        function selectCell(idx) {
-            selectedCell = idx;
-            document.querySelectorAll('.face-cell').forEach((c, i) => {
-                c.classList.toggle('selected', i === idx);
-            });
-            
-            const faceCode = FACES[currentFaceIdx].code;
-            const colors = cubeState[faceCode][0] ? cubeState[faceCode] : detectedColors;
-            const colorIdx = FACES.findIndex(f => f.code === colors[idx]);
-            document.querySelectorAll('.color-btn').forEach((b, i) => {
-                b.classList.toggle('active', i === colorIdx);
-            });
-        }
-        
-        function applyColor(code) {
-            const faceCode = FACES[currentFaceIdx].code;
-            if (!cubeState[faceCode][0]) {
-                detectedColors[selectedCell] = code;
-            } else {
-                cubeState[faceCode][selectedCell] = code;
-            }
-            updateEditor();
-            if (selectedCell < 8) selectCell(selectedCell + 1);
-        }
-        
-        function updateEditor() {
-            const faceCode = FACES[currentFaceIdx].code;
-            const colors = cubeState[faceCode][0] ? cubeState[faceCode] : detectedColors;
-            document.querySelectorAll('.face-cell').forEach((c, i) => {
-                const face = FACES.find(f => f.code === colors[i]);
-                c.style.background = face ? face.color : '#334155';
-            });
-        }
-        
-        function loadFace(idx) {
-            currentFaceIdx = idx;
-            isFaceCaptured = false;
-            detectedColors = Array(9).fill(FACES[idx].code);
-            
-            document.getElementById('shutter-btn').classList.remove('captured');
-            for (let i = 0; i < 9; i++) {
-                const cell = document.getElementById(`cell-${i}`);
-                if (cell && i !== 4) {
-                    cell.style.background = '';
-                    cell.style.opacity = '';
-                }
-            }
-            
-            updateEditor();
-            selectCell(4);
+            // Próxima face após delay
+            setTimeout(() => {
+                nextFace();
+            }, 800);
         }
         
         function nextFace() {
-            if (currentFaceIdx < 5) {
-                currentFaceIdx++;
-                loadFace(currentFaceIdx);
+            currentStep++;
+            resetStability();
+            
+            if (currentStep >= 6) {
+                finishCapture();
+            } else {
                 updateUI();
-                if (isScanning) isFaceCaptured = false;
-            } else {
-                goToSolution();
+                buildMiniCube(); // Atualiza rotação do cubo 3D
             }
         }
         
-        function prevFace() {
-            if (currentFaceIdx > 0) {
-                currentFaceIdx--;
-                loadFace(currentFaceIdx);
-                updateUI();
-                if (isScanning) isFaceCaptured = false;
-            }
+        function skipFace() {
+            // Preenche com cor padrão se pular
+            const current = SCAN_ORDER[currentStep];
+            cubeState[current.code] = Array(9).fill(current.center);
+            nextFace();
         }
         
-        function updateUI() {
-            const f = FACES[currentFaceIdx];
-            document.getElementById('header-title').textContent = `Face ${f.name} (${f.code})`;
+        function finishCapture() {
+            isScanning = false;
+            document.getElementById('status-text').textContent = '✓ Todas as faces capturadas!';
+            document.getElementById('stability-fill').style.width = '100%';
+            document.getElementById('skip-btn').style.display = 'none';
+            document.getElementById('solution-btn').style.display = 'block';
             
-            document.querySelectorAll('.face-dot').forEach((d, i) => {
-                d.className = 'face-dot' + (i < currentFaceIdx ? ' done' : i === currentFaceIdx ? ' active' : '');
-            });
-            
-            document.getElementById('arrow-prev').disabled = currentFaceIdx === 0;
-            document.getElementById('arrow-prev').style.visibility = currentFaceIdx === 0 ? 'hidden' : 'visible';
-            
-            const faceCode = f.code;
-            const isLocked = cubeState[faceCode][0] !== null;
-            const statusEl = document.getElementById('face-status');
-            
-            if (isLocked) {
-                statusEl.textContent = '✓ Face capturada';
-                statusEl.classList.add('locked');
-            } else {
-                statusEl.textContent = 'Aguardando captura...';
-                statusEl.classList.remove('locked');
-            }
-            
-            const actionBtn = document.getElementById('action-btn');
-            if (currentFaceIdx === 5 && isLocked) {
-                actionBtn.textContent = '🎯 Ver Solução';
-                actionBtn.className = 'action-btn solution';
-            } else if (isLocked) {
-                actionBtn.textContent = 'Próxima Face →';
-                actionBtn.className = 'action-btn primary';
-            } else {
-                actionBtn.textContent = 'Capturar Face';
-                actionBtn.className = 'action-btn primary';
-            }
-        }
-        
-        function handleAction() {
-            const f = FACES[currentFaceIdx];
-            const isLocked = cubeState[f.code][0] !== null;
-            
-            if (currentFaceIdx === 5 && isLocked) goToSolution();
-            else if (isLocked) nextFace();
-            else captureFace();
-        }
-        
-        function toggleAuto() {
-            isAutoScan = !isAutoScan;
-            document.getElementById('auto-toggle').style.background = isAutoScan ? '#22c55e' : 'rgba(255,255,255,0.2)';
-            document.getElementById('toggle-knob').style.transform = isAutoScan ? 'translateX(20px)' : '';
-            
-            if (isAutoScan && isScanning && !isFaceCaptured) {
-                if (document.getElementById('scan-status').classList.contains('detected')) {
-                    setTimeout(() => captureFace(), 1000);
-                }
-            }
+            // Salva e vai para solução
+            localStorage.setItem('rubikState', JSON.stringify(cubeState));
         }
         
         function goToSolution() {
-            const allFilled = FACES.every(f => cubeState[f.code][0] !== null);
-            if (!allFilled) {
-                alert('Complete todas as faces!');
-                return;
-            }
-            
-            // Salva estado no localStorage para a outra página
-            localStorage.setItem('rubikState', JSON.stringify(cubeState));
             window.location.href = 'solution.html';
+        }
+        
+        function updateUI() {
+            const current = SCAN_ORDER[currentStep];
+            document.getElementById('header-title').textContent = `Mostre a face ${current.name.toUpperCase()}`;
+            document.getElementById('face-counter').textContent = `${currentStep + 1}/6`;
+            
+            // Atualiza sidebar
+            document.querySelectorAll('.progress-item').forEach((item, idx) => {
+                item.classList.remove('active', 'done');
+                if (idx < currentStep) item.classList.add('done');
+                else if (idx === currentStep) item.classList.add('active');
+            });
+        }
+        
+        function updateScanGrid(colors, isValid) {
+            colors.forEach((code, i) => {
+                const cell = document.getElementById(`scan-${i}`);
+                const color = COLOR_MAP[code] || '#334155';
+                cell.style.backgroundColor = color;
+                cell.style.opacity = '0.8';
+                
+                if (isValid) {
+                    cell.classList.add('detected');
+                } else {
+                    cell.classList.remove('detected');
+                }
+            });
+        }
+        
+        function updateStabilityBar(percent) {
+            document.getElementById('stability-fill').style.width = percent + '%';
+        }
+        
+        function resetStability() {
+            lastColors = null;
+            stabilityStart = null;
+            isStable = false;
+            updateStabilityBar(0);
+        }
+        
+        function colorsEqual(a, b) {
+            return a.every((v, i) => v === b[i]);
+        }
+        
+        function colorName(code) {
+            const names = { U: 'Branco', R: 'Vermelho', F: 'Verde', D: 'Amarelo', L: 'Laranja', B: 'Azul' };
+            return names[code] || code;
+        }
+        
+        function handleFile(e) {
+            // Implementação similar para upload
+            const file = e.target.files[0];
+            if (!file) return;
+            // ... processar imagem
         }
         
         function getPixel(ctx, x, y) {
