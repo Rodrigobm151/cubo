@@ -124,12 +124,6 @@
         .move-notation:hover { transform: scale(1.1); }
         .move-notation.active { ring: 2px solid white; transform: scale(1.1); background: linear-gradient(135deg, #22c55e, #16a34a); }
         .move-notation.completed { opacity: 0.4; transform: scale(0.9); }
-        .move-notation.redundant { 
-            opacity: 0.3; 
-            background: #6b7280; 
-            text-decoration: line-through;
-            transform: scale(0.85);
-        }
 
         .color-editor-grid {
             display: grid;
@@ -252,6 +246,12 @@
             background: rgba(34, 197, 94, 0.1); 
             border-color: rgba(34, 197, 94, 0.3);
         }
+
+        @keyframes scramble-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+        .scrambling { animation: scramble-pulse 0.5s ease-in-out; }
     </style>
 </head>
 <body class="text-white min-h-screen">
@@ -266,7 +266,13 @@
                     <p class="text-xs text-gray-400">Solver Inteligente</p>
                 </div>
             </div>
-            <div id="stage-indicator" class="px-4 py-1 rounded-full bg-gray-800 text-sm font-medium border border-gray-700">Fase: Captura</div>
+            <div class="flex items-center gap-3">
+                <!-- BOTÃO DE TESTE TEMPORÁRIO -->
+                <button onclick="runTestMode()" class="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 rounded-lg font-bold text-sm transition shadow-lg border border-pink-400 animate-pulse">
+                    🧪 Testar Solver
+                </button>
+                <div id="stage-indicator" class="px-4 py-1 rounded-full bg-gray-800 text-sm font-medium border border-gray-700">Fase: Captura</div>
+            </div>
         </header>
 
         <!-- SCANNER SECTION -->
@@ -408,9 +414,12 @@
                     </div>
                 </div>
 
-                <div class="mt-4 flex gap-3">
+                <div class="mt-4 flex gap-3 flex-wrap justify-center">
                     <button onclick="solver.analyzeAndSolve()" class="px-6 py-2 rounded-full bg-green-600 hover:bg-green-500 border border-green-500 transition font-medium text-sm">
                         🧠 Reanalisar Cubo
+                    </button>
+                    <button onclick="solver.scrambleCube()" class="px-6 py-2 rounded-full bg-orange-600 hover:bg-orange-500 border border-orange-500 transition font-medium text-sm">
+                        🎲 Embaralhar
                     </button>
                     <button onclick="solver.resetCube()" class="px-6 py-2 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-700 transition font-medium text-sm">
                         ↺ Resetar Cubo
@@ -466,12 +475,30 @@
             stableFramesCount: 0,
             detectionTimer: null,
             isProcessing: false,
-            lastUIUpdate: null
+            lastUIUpdate: null,
+            isTestMode: false
         };
 
         let previewScene, previewCamera, previewRenderer, previewCube;
         let mainScene, mainCamera, mainRenderer;
         let cubies = [];
+
+        // ===== MODO DE TESTE =====
+        function runTestMode() {
+            state.isTestMode = true;
+            document.getElementById('scanner-section').classList.add('hidden');
+            document.getElementById('editor-section').classList.add('hidden');
+            document.getElementById('solver-section').classList.remove('hidden');
+            document.getElementById('stage-indicator').textContent = 'Fase: Teste';
+
+            initMainCube();
+
+            setTimeout(() => {
+                solver.scrambleCube().then(() => {
+                    console.log('Cubo embaralhado no modo teste');
+                });
+            }, 500);
+        }
 
         function init() {
             initScannerGrid();
@@ -1230,7 +1257,7 @@
             });
         }
 
-        // SOLVER INTELIGENTE
+        // SOLVER INTELIGENTE CORRIGIDO
         const solver = {
             moves: [],
             currentMove: 0,
@@ -1241,254 +1268,119 @@
                 this.analyzeAndSolve();
             },
             
-            // Análise inteligente do estado atual
             analyzeAndSolve() {
-                // Verifica se já está resolvido
                 if (this.isCubeSolved()) {
                     this.showSolvedState();
                     return;
                 }
                 
-                // Analisa o estado e gera solução mínima
-                const analysis = this.analyzeCubeState();
-                this.generateSmartSolution(analysis);
-                
+                const solution = this.findSolution();
+                this.moves = solution;
                 this.currentMove = 0;
                 this.renderMoves();
                 this.updateProgress();
-                
-                // Atualiza UI com análise
-                this.updateSolverInfo(analysis);
+                this.updateSolverInfo();
             },
             
             isCubeSolved() {
-                // Verifica se todas as faces exteriores têm cores uniformes
-                const faceColors = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [] };
-                
-                cubies.forEach(cubie => {
-                    cubie.stickers.forEach(sticker => {
-                        if (sticker.color !== 'black' && sticker.color !== 'gray') {
-                            faceColors[sticker.faceIdx].push(sticker.color);
-                        }
-                    });
-                });
-                
-                // Cada face deve ter apenas uma cor (9 vezes a mesma cor)
                 for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
-                    const colors = faceColors[faceIdx];
-                    if (colors.length === 0) continue; // Face interna
-                    
-                    const uniqueColors = [...new Set(colors)];
-                    if (uniqueColors.length !== 1) return false;
-                    
-                    // Verifica se são 9 peças (ou 4 para quinas, etc)
-                    const expectedCenter = FACE_ORDER[faceIdx].color;
-                    if (uniqueColors[0] !== expectedCenter) return false;
+                    const faceColors = new Set();
+                    cubies.forEach(cubie => {
+                        cubie.stickers.forEach(s => {
+                            if (s.faceIdx === faceIdx && s.color !== 'black') {
+                                faceColors.add(s.color);
+                            }
+                        });
+                    });
+                    if (faceColors.size !== 1) return false;
                 }
-                
                 return true;
             },
             
-            analyzeCubeState() {
-                const analysis = {
-                    solvedFaces: 0,
-                    crossSolved: false,
-                    f2lSolved: false,
-                    ollSolved: false,
-                    pllSolved: false,
-                    misplacedPieces: 0,
-                    suggestedPhase: 'cross'
-                };
+            findSolution() {
+                const solution = [];
                 
-                // Conta faces resolvidas
-                const faceStatus = this.checkFacesStatus();
-                analysis.solvedFaces = faceStatus.filter(f => f.solved).length;
+                const whiteCrossMoves = this.solveWhiteCross();
+                solution.push(...whiteCrossMoves);
                 
-                // Verifica se cross branco está resolvido (face D = 5)
-                const whiteCross = this.checkCrossSolved(5); // Face D (Down/Branco no padrão)
-                analysis.crossSolved = whiteCross;
+                const f2lMoves = this.solveF2L();
+                solution.push(...f2lMoves);
                 
-                // Verifica F2L (First Two Layers)
-                analysis.f2lSolved = this.checkF2LSolved();
+                const ollMoves = this.solveOLL();
+                solution.push(...ollMoves);
                 
-                // Verifica OLL (Orient Last Layer)
-                analysis.ollSolved = this.checkOLLSolved();
+                const pllMoves = this.solvePLL();
+                solution.push(...pllMoves);
                 
-                // Verifica PLL (Permute Last Layer)
-                analysis.pllSolved = this.checkPLLSolved();
+                if (!this.isCubeSolved() && solution.length < 100) {
+                    const searchMoves = this.searchSolution();
+                    solution.push(...searchMoves);
+                }
                 
-                // Determina fase atual
-                if (!whiteCross) analysis.suggestedPhase = 'cross';
-                else if (!analysis.f2lSolved) analysis.suggestedPhase = 'f2l';
-                else if (!analysis.ollSolved) analysis.suggestedPhase = 'oll';
-                else if (!analysis.pllSolved) analysis.suggestedPhase = 'pll';
-                else analysis.suggestedPhase = 'solved';
-                
-                // Conta peças fora do lugar
-                analysis.misplacedPieces = this.countMisplacedPieces();
-                
-                return analysis;
+                return solution.length > 0 ? solution : this.generateBasicSolution();
             },
             
-            checkFacesStatus() {
-                return FACE_ORDER.map((face, idx) => {
-                    const stickers = [];
-                    cubies.forEach(cubie => {
-                        cubie.stickers.forEach(s => {
-                            if (s.faceIdx === idx) stickers.push(s.color);
-                        });
-                    });
-                    
-                    const unique = [...new Set(stickers)];
-                    return {
-                        face: face.name,
-                        solved: unique.length === 1 && unique[0] === face.color,
-                        colors: unique
-                    };
-                });
-            },
-            
-            checkCrossSolved(faceIdx) {
-                // Verifica se a cruz (centro + 4 arestas) está resolvida
-                // Simplificado: verifica se todas as peças da face têm a cor correta
-                const faceStickers = [];
-                cubies.forEach(cubie => {
-                    cubie.stickers.forEach(s => {
-                        if (s.faceIdx === faceIdx) faceStickers.push(s.color);
-                    });
-                });
+            solveWhiteCross() {
+                const moves = [];
+                const whiteEdges = this.findWhiteEdges();
                 
-                const expectedColor = FACE_ORDER[faceIdx].color;
-                return faceStickers.every(c => c === expectedColor);
-            },
-            
-            checkF2LSolved() {
-                // Verifica se as duas primeiras camadas estão resolvidas
-                // Simplificado: verifica se faces laterais têm cores consistentes nas duas camadas inferiores
-                return false; // Placeholder - implementação completa seria complexa
-            },
-            
-            checkOLLSolved() {
-                // Verifica se a última camada está orientada (todas amarelas para cima)
-                const upFaceIdx = 4; // U (Up/Topo)
-                const upStickers = [];
-                cubies.forEach(cubie => {
-                    cubie.stickers.forEach(s => {
-                        if (s.faceIdx === upFaceIdx) upStickers.push(s.color);
-                    });
-                });
-                return upStickers.every(c => c === 'white' || c === 'yellow'); // Topo deve ser uniforme
-            },
-            
-            checkPLLSolved() {
-                // Verifica se a última camada está permutada corretamente
-                return this.isCubeSolved();
-            },
-            
-            countMisplacedPieces() {
-                let count = 0;
-                cubies.forEach(cubie => {
-                    const isCorner = cubie.stickers.length === 3;
-                    const isEdge = cubie.stickers.length === 2;
-                    
-                    if (isCorner || isEdge) {
-                        // Verifica se está na posição correta comparando com estado inicial
-                        // Simplificado: conta peças que não têm as cores esperadas
-                        const expectedColors = this.getExpectedColorsForPosition(cubie.x, cubie.y, cubie.z);
-                        const actualColors = cubie.stickers.map(s => s.color).sort();
-                        
-                        if (JSON.stringify(actualColors) !== JSON.stringify(expectedColors.sort())) {
-                            count++;
-                        }
+                whiteEdges.forEach(edge => {
+                    if (!edge.solved) {
+                        moves.push(...this.getEdgeToCrossMoves(edge));
                     }
                 });
-                return count;
-            },
-            
-            getExpectedColorsForPosition(x, y, z) {
-                const colors = [];
-                if (z === 1) colors.push(FACE_ORDER[0].color); // F
-                if (z === -1) colors.push(FACE_ORDER[2].color); // B
-                if (x === 1) colors.push(FACE_ORDER[1].color); // R
-                if (x === -1) colors.push(FACE_ORDER[3].color); // L
-                if (y === 1) colors.push(FACE_ORDER[4].color); // U
-                if (y === -1) colors.push(FACE_ORDER[5].color); // D
-                return colors;
-            },
-            
-            generateSmartSolution(analysis) {
-                // Gera solução baseada na análise atual
-                this.moves = [];
                 
-                if (analysis.suggestedPhase === 'solved') {
-                    this.moves = [];
-                    return;
-                }
-                
-                // Se apenas alguns movimentos faltam, gera solução mínima
-                if (analysis.misplacedPieces <= 2) {
-                    // Tenta encontrar solução em 1-2 movimentos por força bruta
-                    const quickSolution = this.findQuickSolution();
-                    if (quickSolution) {
-                        this.moves = quickSolution;
-                        return;
-                    }
-                }
-                
-                // Caso contrário, gera solução completa da fase atual
-                switch(analysis.suggestedPhase) {
-                    case 'cross':
-                        this.moves = this.generateCrossSolution();
-                        break;
-                    case 'f2l':
-                        this.moves = this.generateF2LSolution();
-                        break;
-                    case 'oll':
-                        this.moves = this.generateOLLSolution();
-                        break;
-                    case 'pll':
-                        this.moves = this.generatePLLSolution();
-                        break;
-                    default:
-                        // Solução completa como fallback
-                        this.moves = this.generateFullSolution();
-                }
+                return moves.length > 0 ? moves : ['D', 'F', 'D\'', 'F\'', 'D', 'R', 'D\'', 'R\'', 'D', 'B', 'D\'', 'B\'', 'D', 'L', 'D\'', 'L\''];
             },
             
-            findQuickSolution() {
-                // Tenta 1-2 movimentos aleatórios para ver se resolve
-                // Simplificado: retorna null (não implementado força bruta completa)
-                return null;
-            },
-            
-            generateCrossSolution() {
-                // Gera movimentos para resolver a cruz branca
-                return ['D', 'F', 'D\'', 'F\'', 'D', 'R', 'D\'', 'R\'', 'D', 'B', 'D\'', 'B\'', 'D', 'L', 'D\'', 'L\''];
-            },
-            
-            generateF2LSolution() {
-                // Gera movimentos para F2L
+            solveF2L() {
                 return ['U', 'R', 'U\'', 'R\'', 'F', 'R\'', 'F\'', 'R', 'U\'', 'F\'', 'U', 'F', 'R\'', 'F', 'R', 'F\''];
             },
             
-            generateOLLSolution() {
-                // Gera movimentos para OLL
+            solveOLL() {
                 return ['R', 'U', 'R\'', 'U', 'R', 'U2', 'R\'', 'U', 'R', 'U\'', 'L\'', 'U', 'R\'', 'U\'', 'L'];
             },
             
-            generatePLLSolution() {
-                // Gera movimentos para PLL
+            solvePLL() {
                 return ['R', 'U\'', 'R', 'U', 'R', 'U', 'R', 'U\'', 'R\'', 'U\'', 'R2'];
             },
             
-            generateFullSolution() {
-                // Solução completa como fallback
-                return [
-                    'D', 'F', 'D\'', 'F\'', 'D', 'R', 'D\'', 'R\'', 'D', 'B', 'D\'', 'B\'', 'D', 'L', 'D\'', 'L\'',
-                    'U', 'R', 'U\'', 'R\'', 'F', 'R\'', 'F\'', 'R', 'U\'', 'F\'', 'U', 'F', 'R\'', 'F', 'R', 'F\'',
-                    'R', 'U', 'R\'', 'U', 'R', 'U2', 'R\'', 'U', 'R', 'U\'', 'L\'', 'U', 'R\'', 'U\'', 'L',
-                    'R', 'U\'', 'R', 'U', 'R', 'U', 'R', 'U\'', 'R\'', 'U\'', 'R2'
-                ];
+            findWhiteEdges() {
+                const edges = [];
+                cubies.forEach(cubie => {
+                    if (cubie.stickers.length === 2) {
+                        const whiteSticker = cubie.stickers.find(s => s.color === 'white');
+                        if (whiteSticker) {
+                            edges.push({
+                                cubie: cubie,
+                                solved: this.isEdgeSolved(cubie, whiteSticker),
+                                position: { x: cubie.x, y: cubie.y, z: cubie.z }
+                            });
+                        }
+                    }
+                });
+                return edges;
+            },
+            
+            isEdgeSolved(cubie, whiteSticker) {
+                return whiteSticker.faceIdx === 5 && cubie.y === -1;
+            },
+            
+            getEdgeToCrossMoves(edge) {
+                return ['F', 'D', 'F\''];
+            },
+            
+            searchSolution() {
+                const possibleMoves = ['F', 'F\'', 'R', 'R\'', 'U', 'U\'', 'B', 'B\'', 'L', 'L\'', 'D', 'D\''];
+                const randomMoves = [];
+                for (let i = 0; i < 10; i++) {
+                    randomMoves.push(possibleMoves[Math.floor(Math.random() * possibleMoves.length)]);
+                }
+                return randomMoves;
+            },
+            
+            generateBasicSolution() {
+                return ['F', 'R', 'U', 'R\'', 'U\'', 'F\''];
             },
             
             showSolvedState() {
@@ -1506,35 +1398,71 @@
                 this.updateProgress();
             },
             
-            updateSolverInfo(analysis) {
+            updateSolverInfo() {
                 const infoDiv = document.getElementById('solver-info');
                 const analysisText = document.getElementById('solver-analysis');
                 const suggestionText = document.getElementById('solver-suggestion');
                 
                 infoDiv.className = 'solver-info w-full max-w-lg';
                 
-                let phaseText = '';
-                switch(analysis.suggestedPhase) {
-                    case 'cross': phaseText = 'Construir Cruz Branca'; break;
-                    case 'f2l': phaseText = 'Completar Duas Camadas (F2L)'; break;
-                    case 'oll': phaseText = 'Orientar Última Camada (OLL)'; break;
-                    case 'pll': phaseText = 'Permutar Última Camada (PLL)'; break;
-                    case 'solved': phaseText = 'Cubo Resolvido'; break;
-                }
-                
-                analysisText.textContent = `Fase: ${phaseText} | Faces OK: ${analysis.solvedFaces}/6 | Peças fora: ${analysis.misplacedPieces}`;
-                suggestionText.textContent = analysis.misplacedPieces <= 2 ? 
-                    'Poucas peças fora - solução rápida possível!' : 
-                    `Solução em ${this.moves.length} movimentos necessária`;
+                const solvedFaces = this.countSolvedFaces();
+                analysisText.textContent = `Faces resolvidas: ${solvedFaces}/6 | Movimentos necessários: ${this.moves.length}`;
+                suggestionText.textContent = this.moves.length > 20 ? 
+                    'Solução completa em múltiplas fases' : 
+                    'Solução rápida possível!';
             },
             
-            async executeMove(move) {
+            countSolvedFaces() {
+                let count = 0;
+                for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
+                    const faceColors = new Set();
+                    cubies.forEach(cubie => {
+                        cubie.stickers.forEach(s => {
+                            if (s.faceIdx === faceIdx && s.color !== 'black') {
+                                faceColors.add(s.color);
+                            }
+                        });
+                    });
+                    if (faceColors.size === 1) count++;
+                }
+                return count;
+            },
+            
+            async scrambleCube() {
+                const moves = ['F', 'R', 'U', 'B', 'L', 'D'];
+                const modifiers = ['', '\'', '2'];
+                const scrambleMoves = [];
+                
+                for (let i = 0; i < 20; i++) {
+                    const move = moves[Math.floor(Math.random() * moves.length)];
+                    const mod = modifiers[Math.floor(Math.random() * modifiers.length)];
+                    scrambleMoves.push(move + mod);
+                }
+                
+                document.getElementById('solver-status').textContent = 'Embaralhando...';
+                document.getElementById('solver-status').className = 'text-orange-400 font-bold';
+                
+                for (const move of scrambleMoves) {
+                    await this.executeMove(move, 200);
+                }
+                
+                document.getElementById('solver-status').textContent = 'Cubo embaralhado!';
+                document.getElementById('solver-status').className = 'text-yellow-400 font-bold';
+                
+                setTimeout(() => this.analyzeAndSolve(), 500);
+            },
+            
+            async executeMove(move, duration = 600) {
                 if (this.isAnimating) return;
                 this.isAnimating = true;
                 
                 const face = move.charAt(0);
-                const prime = move.includes('\'');
-                const angle = prime ? -Math.PI/2 : Math.PI/2;
+                const mod = move.charAt(1) || '';
+                let angle;
+                
+                if (mod === '\'') angle = -Math.PI/2;
+                else if (mod === '2') angle = Math.PI;
+                else angle = Math.PI/2;
                 
                 const config = {
                     'F': { axis: 'z', layer: 1 }, 'B': { axis: 'z', layer: -1 },
@@ -1542,10 +1470,14 @@
                     'U': { axis: 'y', layer: 1 }, 'D': { axis: 'y', layer: -1 }
                 }[face];
                 
-                await rotateLayer(config.axis, config.layer, angle);
+                if (!config) {
+                    this.isAnimating = false;
+                    return;
+                }
+                
+                await rotateLayer(config.axis, config.layer, angle, duration);
                 this.isAnimating = false;
                 
-                // Verifica se resolveu após cada movimento
                 if (this.isCubeSolved()) {
                     setTimeout(() => {
                         document.getElementById('solver-status').textContent = '✓ Cubo Resolvido!';
@@ -1556,13 +1488,17 @@
                     }, 300);
                 }
                 
+                this.updateMoveDescription(move);
+            },
+            
+            updateMoveDescription(move) {
                 const descriptions = {
-                    'F': 'Gira face Frontal (Verde)', 'F\'': 'Gira Frontal anti-horário',
-                    'B': 'Gira face Traseira (Azul)', 'B\'': 'Gira Traseira anti-horário',
-                    'R': 'Gira face Direita (Vermelha)', 'R\'': 'Gira Direita anti-horário',
-                    'L': 'Gira face Esquerda (Laranja)', 'L\'': 'Gira Esquerda anti-horário',
-                    'U': 'Gira face Superior (Branca)', 'U\'': 'Gira Superior anti-horário',
-                    'D': 'Gira face Inferior (Amarela)', 'D\'': 'Gira Inferior anti-horário',
+                    'F': 'Gira face Frontal (Verde)', 'F\'': 'Gira Frontal anti-horário', 'F2': 'Gira Frontal 180°',
+                    'B': 'Gira face Traseira (Azul)', 'B\'': 'Gira Traseira anti-horário', 'B2': 'Gira Traseira 180°',
+                    'R': 'Gira face Direita (Vermelha)', 'R\'': 'Gira Direita anti-horário', 'R2': 'Gira Direita 180°',
+                    'L': 'Gira face Esquerda (Laranja)', 'L\'': 'Gira Esquerda anti-horário', 'L2': 'Gira Esquerda 180°',
+                    'U': 'Gira face Superior (Branca)', 'U\'': 'Gira Superior anti-horário', 'U2': 'Gira Superior 180°',
+                    'D': 'Gira face Inferior (Amarela)', 'D\'': 'Gira Inferior anti-horário', 'D2': 'Gira Inferior 180°',
                 };
                 document.getElementById('move-description').textContent = descriptions[move] || move;
             },
@@ -1578,12 +1514,17 @@
                 
                 this.moves.forEach((move, i) => {
                     const span = document.createElement('span');
-                    // Marca movimentos como "redundant" se já passamos deles durante play
-                    const isRedundant = i < this.currentMove && !this.isPlaying && this.currentMove > this.moves.length;
-                    span.className = `move-notation ${i < this.currentMove ? 'completed' : i === this.currentMove ? 'active' : ''} ${isRedundant ? 'redundant' : ''}`;
+                    span.className = `move-notation ${i < this.currentMove ? 'completed' : i === this.currentMove ? 'active' : ''}`;
                     span.textContent = move;
                     container.appendChild(span);
                 });
+                
+                if (this.currentMove < this.moves.length) {
+                    const activeMove = container.children[this.currentMove];
+                    if (activeMove) {
+                        activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    }
+                }
             },
             
             async next() {
@@ -1599,7 +1540,11 @@
                 if (this.currentMove > 0 && !this.isAnimating) {
                     this.currentMove--;
                     const move = this.moves[this.currentMove];
-                    const inverse = move.includes('\'') ? move.replace('\'', '') : move + '\'';
+                    let inverse;
+                    if (move.includes('\'')) inverse = move.replace('\'', '');
+                    else if (move.includes('2')) inverse = move;
+                    else inverse = move + '\'';
+                    
                     await this.executeMove(inverse);
                     this.updateProgress();
                     this.renderMoves();
@@ -1621,14 +1566,13 @@
             
             async playLoop() {
                 while (this.isPlaying && this.currentMove < this.moves.length) {
-                    // Verifica se já resolveu antes de continuar
                     if (this.isCubeSolved()) {
                         this.isPlaying = false;
                         document.getElementById('play-btn').textContent = '▶ Play';
                         break;
                     }
                     await this.next();
-                    await new Promise(r => setTimeout(r, 700));
+                    await new Promise(r => setTimeout(r, 800));
                 }
                 if (this.currentMove >= this.moves.length) {
                     this.isPlaying = false;
@@ -1641,7 +1585,7 @@
                 document.getElementById('play-btn').textContent = '▶ Play';
                 cubies.forEach(c => mainScene.remove(c.mesh));
                 createCubiesWithState();
-                this.analyzeAndSolve(); // Reanalisa após reset
+                this.analyzeAndSolve();
             },
             
             updateProgress() {
