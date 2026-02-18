@@ -2,51 +2,129 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Rubik AI Solver</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.1/dist/cube.js"></script>
     <style>
-        :root { --accent: #00ff88; }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; color: white; }
+        :root { --accent: #00ff88; --bg: #000; }
         
-        /* Scanner UI */
-        #scanner-container { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        
-        #overlay { 
-            position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%);
-            width: 250px; height: 250px; display: grid; 
-            grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
-            border: 4px solid var(--accent); border-radius: 8px; box-shadow: 0 0 20px rgba(0,255,136,0.4);
+        html, body { 
+            position: fixed; 
+            width: 100%; 
+            height: 100%; 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background: var(--bg); 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
         }
-        .grid-cell { border: 1px solid rgba(255,255,255,0.3); position: relative; }
-        .grid-cell::after { 
-            content: ''; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; 
-            background: white; border-radius: 50%; transform: translate(-50%, -50%);
+
+        #scanner-container { 
+            display: flex; 
+            flex-direction: column; 
+            width: 100%; 
+            height: 100%; 
+        }
+
+        video { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            z-index: 1;
+        }
+
+        /* Grade de captura */
+        #overlay { 
+            position: absolute; 
+            top: 42%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            width: min(75vw, 280px); 
+            height: min(75vw, 280px); 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            grid-template-rows: repeat(3, 1fr);
+            border: 3px solid var(--accent); 
+            border-radius: 12px; 
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .grid-cell { 
+            border: 1px solid rgba(255,255,255,0.3); 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Ponto central de amostragem */
+        .grid-cell::after {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.5;
         }
 
         /* Mini Preview 3D */
         #mini-preview { 
-            position: absolute; top: 20px; right: 20px; 
-            width: 120px; height: 120px; 
-            background: rgba(0,0,0,0.5); border-radius: 15px; border: 1px solid #444;
+            position: absolute; 
+            top: 20px; 
+            right: 20px; 
+            width: 110px; 
+            height: 110px; 
+            background: rgba(0,0,0,0.6); 
+            border-radius: 15px; 
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 20;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        /* Painel de Instruções */
+        /* Painel de Informações inferior */
         .info-panel { 
-            position: absolute; bottom: 0; width: 100%; padding: 30px 0;
+            position: absolute; 
+            bottom: 0; 
+            width: 100%; 
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
             background: linear-gradient(transparent, rgba(0,0,0,0.9) 30%);
             text-align: center; 
+            z-index: 30;
         }
-        .instruction-text { font-size: 1.1rem; margin-bottom: 15px; font-weight: 300; }
-        .target-face { color: var(--accent); font-weight: bold; text-transform: uppercase; }
+
+        .instruction-text { 
+            font-size: 1rem; 
+            margin-bottom: 15px; 
+            color: #fff;
+            text-shadow: 1px 1px 4px #000;
+        }
+
+        .target-face { 
+            display: block;
+            color: var(--accent); 
+            font-weight: 800; 
+            font-size: 1.5rem;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
 
         button { 
-            padding: 16px 40px; border-radius: 50px; border: none; 
-            background: var(--accent); color: #000; font-weight: bold; 
-            font-size: 1rem; cursor: pointer; box-shadow: 0 4px 15px rgba(0,255,136,0.3);
+            padding: 18px 45px; 
+            border-radius: 16px; 
+            border: none; 
+            background: var(--accent); 
+            color: #000; 
+            font-weight: 800; 
+            font-size: 1.1rem; 
+            cursor: pointer; 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            transition: transform 0.1s;
         }
+
+        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -63,52 +141,52 @@
         <div id="mini-preview"></div>
 
         <div class="info-panel">
-            <div class="instruction-text">Aponte para a face <span id="face-name" class="target-face">BRANCA (Topo)</span></div>
+            <div class="instruction-text">
+                Posicione a face:
+                <span id="face-name" class="target-face">BRANCA (Topo)</span>
+            </div>
             <button onclick="captureCurrentFace()">CAPTURAR FACE</button>
         </div>
     </div>
 
     <script>
-        const faces = ['U', 'R', 'F', 'D', 'L', 'B']; // Up, Right, Front, Down, Left, Back
-        const faceColorsLabel = ["BRANCA", "VERMELHA", "VERDE", "AMARELA", "LARANJA", "AZUL"];
+        const faces = ['U', 'R', 'F', 'D', 'L', 'B'];
+        const faceNames = ["BRANCA (Topo)", "VERMELHA (Direita)", "VERDE (Frente)", "AMARELA (Base)", "LARANJA (Esquerda)", "AZUL (Trás)"];
         let currentStep = 0;
-        let cubeState = {}; // Guardará as cores: { 'U': [9 cores], 'R': [9 cores]... }
+        let cubeState = {};
 
-        // --- INICIALIZAÇÃO 3D MINI PREVIEW ---
+        // --- MINI PREVIEW 3D ---
         let miniScene, miniCamera, miniRenderer, miniCubeGroup;
-        const miniContainer = document.getElementById('mini-preview');
 
         function initMini3D() {
+            const container = document.getElementById('mini-preview');
             miniScene = new THREE.Scene();
             miniCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
             miniCamera.position.set(3, 3, 3);
             miniCamera.lookAt(0, 0, 0);
 
             miniRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            miniRenderer.setSize(120, 120);
-            miniContainer.appendChild(miniRenderer.domElement);
+            miniRenderer.setSize(110, 110);
+            container.appendChild(miniRenderer.domElement);
 
             const light = new THREE.DirectionalLight(0xffffff, 1);
             light.position.set(2, 5, 2);
             miniScene.add(light);
-            miniScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            miniScene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
             createMiniCube();
+            rotateMiniToFace('U');
             animateMini();
         }
 
         function createMiniCube() {
             miniCubeGroup = new THREE.Group();
-            const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
-            
+            const geometry = new THREE.BoxGeometry(0.92, 0.92, 0.92);
             for (let x = -1; x <= 1; x++) {
                 for (let y = -1; y <= 1; y++) {
                     for (let z = -1; z <= 1; z++) {
-                        const material = new THREE.MeshStandardMaterial({ color: 0x222222 });
-                        const mesh = new THREE.Mesh(geometry, material);
+                        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x222222 }));
                         mesh.position.set(x, y, z);
-                        // Guardar coordenadas para colorir depois
-                        mesh.userData = { x, y, z };
                         miniCubeGroup.add(mesh);
                     }
                 }
@@ -116,17 +194,35 @@
             miniScene.add(miniCubeGroup);
         }
 
-        // --- CAPTURA DE COR ---
+        function rotateMiniToFace(face) {
+            const rots = {
+                'U': [Math.PI/4, Math.PI/4, 0],
+                'R': [0, -Math.PI/2, 0],
+                'F': [0, 0, 0],
+                'D': [-Math.PI/2, 0, 0],
+                'L': [0, Math.PI/2, 0],
+                'B': [0, Math.PI, 0]
+            };
+            const target = rots[face];
+            miniCubeGroup.rotation.set(target[0], target[1], target[2]);
+        }
+
+        function animateMini() {
+            requestAnimationFrame(animateMini);
+            miniRenderer.render(miniScene, miniCamera);
+        }
+
+        // --- CAMERA E CAPTURA ---
         async function setupCamera() {
             const video = document.getElementById('camera');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', width: 1280, height: 720 }, 
+                    video: { facingMode: 'environment', focusMode: 'continuous' }, 
                     audio: false 
                 });
                 video.srcObject = stream;
             } catch (err) {
-                alert("Erro ao acessar câmera: " + err);
+                alert("Permissão de câmera negada ou erro: " + err);
             }
         }
 
@@ -138,28 +234,23 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0);
 
-            // Analisar os 9 pontos da grade
-            const colors = analyzeGrid(canvas, ctx);
+            // Coleta de cores
+            const colors = analyzeColors(canvas, ctx);
             cubeState[faces[currentStep]] = colors;
-
-            // Feedback visual no mini cubo
-            updateMiniCubeColors();
 
             currentStep++;
             if (currentStep < faces.length) {
-                document.getElementById('face-name').innerText = faceColorsLabel[currentStep] + " (" + faces[currentStep] + ")";
-                rotateMiniCubeToFace(faces[currentStep]);
+                document.getElementById('face-name').innerText = faceNames[currentStep];
+                rotateMiniToFace(faces[currentStep]);
             } else {
-                alert("Escaneamento Completo! Iniciando Solucionador...");
-                // Aqui redirecionaria para a tela de solução
+                alert("Todas as faces capturadas! Pronto para resolver.");
             }
         }
 
-        function analyzeGrid(canvas, ctx) {
+        function analyzeColors(canvas, ctx) {
             const overlay = document.getElementById('overlay').getBoundingClientRect();
             const videoEl = document.getElementById('camera').getBoundingClientRect();
             
-            // Proporção entre o vídeo exibido e o real
             const scaleX = canvas.width / videoEl.width;
             const scaleY = canvas.height / videoEl.height;
 
@@ -173,54 +264,11 @@
                 for (let c = 0; c < 3; c++) {
                     const x = startX + (c + 0.5) * stepX;
                     const y = startY + (r + 0.5) * stepY;
-                    const pixel = ctx.getImageData(x, y, 1, 1).data;
-                    faceColors.push(rgbToHex(pixel[0], pixel[1], pixel[2]));
+                    const p = ctx.getImageData(x, y, 1, 1).data;
+                    faceColors.push(`rgb(${p[0]},${p[1]},${p[2]})`);
                 }
             }
             return faceColors;
-        }
-
-        function rgbToHex(r, g, b) {
-            // Lógica simples de classificação de cor por proximidade
-            if (r > 150 && g > 150 && b > 150) return 0xffffff; // Branco
-            if (r > 150 && g < 100 && b < 100) return 0xb71234; // Vermelho
-            if (g > 150 && r < 120 && b < 120) return 0x009b48; // Verde
-            if (r > 180 && g > 180 && b < 100) return 0xffd700; // Amarelo
-            if (r > 180 && g > 100 && b < 100) return 0xff5800; // Laranja
-            if (b > 150 && r < 100) return 0x0046ad; // Azul
-            return 0x444444; // Fallback cinza
-        }
-
-        function updateMiniCubeColors() {
-    const currentColors = cubeState[faces[currentStep]];
-    // Filtramos os cubinhos que pertencem à face atual (ex: se for 'U', y=1)
-    miniCubeGroup.children.forEach((block, index) => {
-        // Lógica simplificada: se estiver na face certa, aplica a cor detectada no centro
-        if(currentStep === 0 && block.position.y === 1) { // Face Topo
-             // Mapeamento de cores capturadas para o modelo 3D
-             block.material.color.setHex(currentColors[4]); // Cor do centro
-        }
-    });
-}
-
-        function rotateMiniCubeToFace(faceCode) {
-            // Anima o mini cubo para mostrar qual face o usuário deve virar
-            const rotations = {
-                'U': { x: 0.5, y: 0.5 },
-                'R': { x: 0, y: -Math.PI/2 },
-                'F': { x: 0, y: 0 },
-                'D': { x: -Math.PI/2, y: 0 },
-                'L': { x: 0, y: Math.PI/2 },
-                'B': { x: 0, y: Math.PI }
-            };
-            const rot = rotations[faceCode];
-            // Simplificado: apenas muda a rotação do grupo
-            miniCubeGroup.rotation.set(rot.x, rot.y, 0);
-        }
-
-        function animateMini() {
-            requestAnimationFrame(animateMini);
-            miniRenderer.render(miniScene, miniCamera);
         }
 
         window.onload = () => {
