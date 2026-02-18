@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Rubik Pro Scanner</title>
+    <title>Rubik Auto-Scanner</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         :root { --error: #ff3b30; --success: #4cd964; --accent: #007aff; }
@@ -12,49 +12,52 @@
         #main-view { position: relative; width: 100%; height: 100%; }
         video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 
-        /* Grade Dinâmica */
+        /* Flash de captura */
+        #flash { position: absolute; width: 100%; height: 100%; background: white; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+
+        /* Grade de Captura */
         #overlay { 
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
             width: 280px; height: 280px; display: grid; grid-template-columns: repeat(3, 1fr);
             border: 4px solid var(--error); border-radius: 12px; z-index: 10;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
-        #overlay.valid { border-color: var(--success); box-shadow: 0 0 25px var(--success); }
+        #overlay.valid { border-color: var(--success); transform: translate(-50%, -50%) scale(1.02); box-shadow: 0 0 30px var(--success); }
 
-        .grid-cell { border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
-        .sensor { width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px #000; }
+        .grid-cell { border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; }
+        .sensor { width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px #000; transition: background 0.1s; }
 
-        /* UI */
+        /* UI de Instruções */
         #ui-top { 
             position: absolute; top: 0; width: 100%; padding: 50px 0 20px;
             background: linear-gradient(rgba(0,0,0,0.8), transparent); color: white;
             text-align: center; z-index: 20;
         }
-        .timer-progress { position: absolute; bottom: 0; left: 0; height: 5px; background: var(--success); width: 0%; }
+        #instr { font-size: 1.2rem; margin-bottom: 5px; }
+        .target-label { color: var(--success); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* Barra de Progresso da Captura (1 segundo) */
+        .timer-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; background: rgba(255,255,255,0.2); }
+        #timer-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.1s linear; }
 
-        #cube-preview { 
-            position: absolute; bottom: 120px; right: 20px; 
-            width: 140px; height: 140px; background: rgba(0,0,0,0.4); 
-            border-radius: 15px; z-index: 30; border: 1px solid rgba(255,255,255,0.1);
-        }
+        #cube-preview { position: absolute; bottom: 120px; right: 20px; width: 130px; height: 130px; background: rgba(0,0,0,0.5); border-radius: 15px; z-index: 30; border: 1px solid rgba(255,255,255,0.2); }
 
         .btn-container { position: absolute; bottom: 40px; width: 100%; text-align: center; z-index: 40; }
-        button { 
-            padding: 18px 40px; border-radius: 35px; border: none; 
-            background: #fff; color: #000; font-weight: bold; font-size: 1rem;
-            display: none; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-        }
+        button { padding: 18px 45px; border-radius: 35px; border: none; background: var(--success); color: #000; font-weight: bold; font-size: 1rem; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.4); animation: pop 0.3s ease; }
+        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
+
+    <div id="flash"></div>
 
     <div id="main-view">
         <video id="camera" autoplay playsinline></video>
         
         <div id="ui-top">
-            <div id="instr">Alinhe a Face: <b id="face-target" style="color:var(--success)">FRENTE (Verde)</b></div>
-            <div id="step">Passo 1 de 6</div>
-            <div class="timer-progress" id="timer-bar"></div>
+            <div id="instr">Posicione a face <span id="face-target" class="target-label">Frente (Verde)</span></div>
+            <div id="step">Face 1 de 6</div>
+            <div class="timer-container"><div id="timer-bar"></div></div>
         </div>
 
         <div id="overlay">
@@ -66,59 +69,51 @@
         <div id="cube-preview"></div>
 
         <div class="btn-container">
-            <button id="next-btn" onclick="nextStep()">CONFIRMAR FACE</button>
+            <button id="next-btn" onclick="nextStep()">CONFIRMAR FACE ✅</button>
         </div>
     </div>
 
     <script>
         const sequence = [
-            { id: 'F', name: 'FRENTE (Verde)', centerRGB: [0, 150, 70] },
-            { id: 'R', name: 'DIREITA (Vermelho)', centerRGB: [180, 20, 50] },
-            { id: 'B', name: 'TRÁS (Azul)', centerRGB: [0, 70, 170] },
-            { id: 'L', name: 'ESQUERDA (Laranja)', centerRGB: [255, 90, 0] },
-            { id: 'U', name: 'TOPO (Branco)', centerRGB: [230, 230, 230] },
-            { id: 'D', name: 'BASE (Amarelo)', centerRGB: [240, 200, 0] }
+            { id: 'F', name: 'FRENTE (Verde)', center: [0, 150, 70] },
+            { id: 'R', name: 'DIREITA (Vermelho)', center: [180, 20, 50] },
+            { id: 'B', name: 'TRÁS (Azul)', center: [0, 70, 170] },
+            { id: 'L', name: 'ESQUERDA (Laranja)', center: [255, 90, 0] },
+            { id: 'U', name: 'TOPO (Branco)', center: [220, 220, 220] },
+            { id: 'D', name: 'BASE (Amarelo)', center: [240, 200, 0] }
         ];
 
         let currentIdx = 0;
         let isStable = false;
-        let captureData = [];
+        let stabilityTimer = 0;
+        let faceAlreadyCaptured = false;
 
-        // Three.js
         let scene, camera, renderer, cubeGroup;
 
         async function init() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', focusMode: 'continuous' } });
             document.getElementById('camera').srcObject = stream;
-            
             init3D();
-            requestAnimationFrame(tick);
+            tick();
         }
 
         function init3D() {
             const container = document.getElementById('cube-preview');
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10);
-            camera.position.set(2.5, 2.5, 2.5);
+            camera.position.set(2.6, 2.6, 2.6);
             camera.lookAt(0,0,0);
-            
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
             container.appendChild(renderer.domElement);
+            scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambient);
-
-            // Criar o cubo 3x3x3 composto
             cubeGroup = new THREE.Group();
-            const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
-            
             for(let x=-1; x<=1; x++) {
                 for(let y=-1; y<=1; y++) {
                     for(let z=-1; z<=1; z++) {
-                        // 6 materiais por cubinho: [Direita, Esquerda, Topo, Base, Frente, Trás]
-                        const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
-                        const mesh = new THREE.Mesh(geometry, materials);
+                        const mats = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x111111 }));
+                        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.92, 0.92), mats);
                         mesh.position.set(x, y, z);
                         mesh.userData = { pos: {x, y, z} };
                         cubeGroup.add(mesh);
@@ -126,7 +121,6 @@
                 }
             }
             scene.add(cubeGroup);
-            animate();
         }
 
         function tick() {
@@ -134,20 +128,22 @@
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = 200; canvas.height = 200; // Resolução otimizada para scan
-                ctx.drawImage(video, 0, 0, 200, 200);
+                canvas.width = 300; canvas.height = 300;
+                ctx.drawImage(video, 0, 0, 300, 300);
 
-                const colors = scanColors(ctx, canvas);
+                const colors = getColors(ctx, canvas);
                 updateSensors(colors);
-                validateCenter(colors[4], ctx, canvas); // 4 é o centro da grade 3x3
+
+                if (!faceAlreadyCaptured) {
+                    validateCenter(colors[4]); // 4 é o centro
+                }
             }
             requestAnimationFrame(tick);
         }
 
-        function scanColors(ctx, canvas) {
+        function getColors(ctx, canvas) {
             const overlay = document.getElementById('overlay').getBoundingClientRect();
             const v = document.getElementById('camera').getBoundingClientRect();
-            
             const startX = (overlay.left - v.left) * (canvas.width / v.width);
             const startY = (overlay.top - v.top) * (canvas.height / v.height);
             const size = (overlay.width / 3) * (canvas.width / v.width);
@@ -167,91 +163,88 @@
             dots.forEach((dot, i) => dot.style.background = colors[i]);
         }
 
-        function validateCenter(centerRGBstr, ctx, canvas) {
-            const rgb = centerRGBstr.match(/\d+/g).map(Number);
-            const target = sequence[currentIdx].centerRGB;
-            const diff = Math.sqrt(Math.pow(rgb[0]-target[0],2) + Math.pow(rgb[1]-target[1],2) + Math.pow(rgb[2]-target[2],2));
+        function validateCenter(centerColorStr) {
+            const rgb = centerColorStr.match(/\d+/g).map(Number);
+            const target = sequence[currentIdx].center;
+            const dist = Math.sqrt(Math.pow(rgb[0]-target[0],2) + Math.pow(rgb[1]-target[1],2) + Math.pow(rgb[2]-target[2],2));
 
             const overlay = document.getElementById('overlay');
-            if (diff < 75) {
-                if (!isStable) startCountdown(ctx, canvas);
-                isStable = true;
-                overlay.classList.add('valid');
+            const timerBar = document.getElementById('timer-bar');
+
+            if (dist < 85) { // Se a cor central bater com o alvo
+                if (!isStable) {
+                    isStable = true;
+                    stabilityTimer = Date.now();
+                    overlay.classList.add('valid');
+                }
+                
+                let elapsed = Date.now() - stabilityTimer;
+                timerBar.style.width = Math.min(100, (elapsed / 1000) * 100) + '%';
+
+                if (elapsed >= 1000) { // 1 segundo de estabilidade
+                    triggerCapture();
+                }
             } else {
                 isStable = false;
                 overlay.classList.remove('valid');
-                document.getElementById('timer-bar').style.width = '0%';
+                timerBar.style.width = '0%';
             }
         }
 
-        let timerStart = 0;
-        function startCountdown(ctx, canvas) {
-            timerStart = Date.now();
-            const check = () => {
-                if(!isStable) return;
-                const elapsed = Date.now() - timerStart;
-                document.getElementById('timer-bar').style.width = Math.min(100, (elapsed/1000)*100) + '%';
-                
-                if(elapsed >= 1000) {
-                    captureFaceData(ctx, canvas);
-                } else {
-                    requestAnimationFrame(check);
-                }
-            };
-            check();
-        }
+        function triggerCapture() {
+            faceAlreadyCaptured = true;
+            isStable = false;
+            
+            // Efeito de Flash
+            const f = document.getElementById('flash');
+            f.style.opacity = '1';
+            setTimeout(() => f.style.opacity = '0', 150);
+            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
 
-        function captureFaceData(ctx, canvas) {
-            if (navigator.vibrate) navigator.vibrate(50);
-            const colors = scanColors(ctx, canvas);
-            applyColorsToCube(colors);
+            // Captura as cores finais da grade
+            const video = document.getElementById('camera');
+            const canvas = document.createElement('canvas');
+            canvas.width = 300; canvas.height = 300;
+            canvas.getContext('2d').drawImage(video, 0, 0, 300, 300);
+            const finalColors = getColors(canvas.getContext('2d'), canvas);
+
+            // Aplica no Cubo 3D
+            applyColors(finalColors, sequence[currentIdx].id);
+            
             document.getElementById('next-btn').style.display = 'inline-block';
-            isStable = false; // Trava a captura até o próximo passo
+            document.getElementById('timer-bar').style.width = '100%';
         }
 
-        function applyColorsToCube(colors) {
-            const faceId = sequence[currentIdx].id;
+        function applyColors(colors, faceId) {
             cubeGroup.children.forEach(cube => {
                 const p = cube.userData.pos;
                 let idx = -1;
-                
-                // Mapeia 9 cores da câmera para as faces 3D
-                if(faceId === 'F' && p.z === 1) {
-                    idx = (1-p.y)*3 + (p.x+1);
-                    cube.material[4].color.set(colors[idx]);
-                } else if(faceId === 'R' && p.x === 1) {
-                    idx = (1-p.y)*3 + (1-p.z);
-                    cube.material[0].color.set(colors[idx]);
-                } else if(faceId === 'B' && p.z === -1) {
-                    idx = (1-p.y)*3 + (1-p.x);
-                    cube.material[5].color.set(colors[idx]);
-                } else if(faceId === 'L' && p.x === -1) {
-                    idx = (1-p.y)*3 + (p.z+1);
-                    cube.material[1].color.set(colors[idx]);
-                } else if(faceId === 'U' && p.y === 1) {
-                    idx = (p.z+1)*3 + (p.x+1);
-                    cube.material[2].color.set(colors[idx]);
-                } else if(faceId === 'D' && p.y === -1) {
-                    idx = (1-p.z)*3 + (p.x+1);
-                    cube.material[3].color.set(colors[idx]);
-                }
+                if(faceId === 'F' && p.z === 1) idx = (1-p.y)*3 + (p.x+1);
+                else if(faceId === 'R' && p.x === 1) idx = (1-p.y)*3 + (1-p.z);
+                else if(faceId === 'B' && p.z === -1) idx = (1-p.y)*3 + (1-p.x);
+                else if(faceId === 'L' && p.x === -1) idx = (1-p.y)*3 + (p.z+1);
+                else if(faceId === 'U' && p.y === 1) idx = (p.z+1)*3 + (p.x+1);
+                else if(faceId === 'D' && p.y === -1) idx = (1-p.z)*3 + (p.x+1);
+
+                const matIdx = { 'R':0, 'L':1, 'U':2, 'D':3, 'F':4, 'B':5 }[faceId];
+                if(idx !== -1) cube.material[matIdx].color.set(colors[idx]);
             });
         }
 
         function nextStep() {
             currentIdx++;
             if (currentIdx < sequence.length) {
+                faceAlreadyCaptured = false;
                 document.getElementById('face-target').innerText = sequence[currentIdx].name;
-                document.getElementById('step').innerText = `Passo ${currentIdx+1} de 6`;
+                document.getElementById('step').innerText = `Face ${currentIdx+1} de 6`;
                 document.getElementById('next-btn').style.display = 'none';
                 document.getElementById('timer-bar').style.width = '0%';
                 
-                // Rotaciona o mini-cubo para ajudar o usuário
-                const rots = [[0,0,0], [0,-Math.PI/2,0], [0,Math.PI,0], [0,Math.PI/2,0], [Math.PI/2,0,0], [-Math.PI/2,0,0]];
-                const r = rots[currentIdx];
-                cubeGroup.rotation.set(r[0], r[1], r[2]);
+                // Rotaciona o mini cubo para a próxima face
+                const r = [[0,0,0], [0,-1.57,0], [0,3.14,0], [0,1.57,0], [1.57,0,0], [-1.57,0,0]][currentIdx];
+                cubeGroup.rotation.set(r[0], r[1], 0);
             } else {
-                alert("Cubo Completo! Redirecionando para solução...");
+                alert("Escaneamento concluído! O cubo 3D está pronto.");
             }
         }
 
