@@ -192,9 +192,16 @@
         }
 
         function updateMiniCubeColors() {
-            // Atualiza as cores do mini cubo baseado no que foi capturado
-            // Ex: Se capturou face 'U' (y=1), pinta os cubinhos do topo
+    const currentColors = cubeState[faces[currentStep]];
+    // Filtramos os cubinhos que pertencem à face atual (ex: se for 'U', y=1)
+    miniCubeGroup.children.forEach((block, index) => {
+        // Lógica simplificada: se estiver na face certa, aplica a cor detectada no centro
+        if(currentStep === 0 && block.position.y === 1) { // Face Topo
+             // Mapeamento de cores capturadas para o modelo 3D
+             block.material.color.setHex(currentColors[4]); // Cor do centro
         }
+    });
+}
 
         function rotateMiniCubeToFace(faceCode) {
             // Anima o mini cubo para mostrar qual face o usuário deve virar
