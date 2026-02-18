@@ -3,148 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Rubik AI Solver</title>
+    <title>Rubik AI Scanner</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         :root { --accent: #00ff88; --bg: #000; }
-        
         html, body { 
-            position: fixed; 
-            width: 100%; 
-            height: 100%; 
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; 
-            background: var(--bg); 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            position: fixed; width: 100%; height: 100%; margin: 0; padding: 0; 
+            overflow: hidden; background: var(--bg); font-family: sans-serif; 
         }
+        #scanner-container { display: flex; flex-direction: column; width: 100%; height: 100%; }
+        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 
-        #scanner-container { 
-            display: flex; 
-            flex-direction: column; 
-            width: 100%; 
-            height: 100%; 
-        }
-
-        video { 
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
-            z-index: 1;
-        }
-
-        /* Grade de captura */
+        /* Grade e Sensores */
         #overlay { 
-            position: absolute; 
-            top: 42%; 
-            left: 50%; 
-            transform: translate(-50%, -50%);
-            width: min(75vw, 280px); 
-            height: min(75vw, 280px); 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            grid-template-rows: repeat(3, 1fr);
-            border: 3px solid var(--accent); 
-            border-radius: 12px; 
-            z-index: 10;
-            pointer-events: none;
+            position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%);
+            width: min(75vw, 280px); height: min(75vw, 280px); 
+            display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+            border: 3px solid var(--accent); border-radius: 12px; z-index: 10; pointer-events: none;
+        }
+        .grid-cell { border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
+        .sensor-dot { 
+            width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; 
+            box-shadow: 0 0 5px rgba(0,0,0,0.5); transition: background 0.1s; 
         }
 
-        .grid-cell { 
-            border: 1px solid rgba(255,255,255,0.3); 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* Ponto central de amostragem */
-        .grid-cell::after {
-            content: '';
-            width: 4px;
-            height: 4px;
-            background: white;
-            border-radius: 50%;
-            opacity: 0.5;
-        }
-
-        /* Mini Preview 3D */
         #mini-preview { 
-            position: absolute; 
-            top: 20px; 
-            right: 20px; 
-            width: 110px; 
-            height: 110px; 
-            background: rgba(0,0,0,0.6); 
-            border-radius: 15px; 
-            border: 1px solid rgba(255,255,255,0.2);
-            z-index: 20;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: absolute; top: 20px; right: 20px; width: 110px; height: 110px; 
+            background: rgba(0,0,0,0.6); border-radius: 15px; border: 1px solid rgba(255,255,255,0.2); z-index: 20;
         }
 
-        /* Painel de Informações inferior */
         .info-panel { 
-            position: absolute; 
-            bottom: 0; 
-            width: 100%; 
-            padding-bottom: calc(20px + env(safe-area-inset-bottom));
-            background: linear-gradient(transparent, rgba(0,0,0,0.9) 30%);
-            text-align: center; 
-            z-index: 30;
+            position: absolute; bottom: 0; width: 100%; padding-bottom: calc(30px + env(safe-area-inset-bottom));
+            background: linear-gradient(transparent, rgba(0,0,0,0.9) 30%); text-align: center; z-index: 30;
         }
-
-        .instruction-text { 
-            font-size: 1rem; 
-            margin-bottom: 15px; 
-            color: #fff;
-            text-shadow: 1px 1px 4px #000;
-        }
-
-        .target-face { 
-            display: block;
-            color: var(--accent); 
-            font-weight: 800; 
-            font-size: 1.5rem;
-            margin-top: 4px;
-            text-transform: uppercase;
-        }
-
+        .instruction-text { color: #fff; text-shadow: 1px 1px 4px #000; margin-bottom: 15px; }
+        .target-face { display: block; color: var(--accent); font-weight: 800; font-size: 1.5rem; text-transform: uppercase; }
         button { 
-            padding: 18px 45px; 
-            border-radius: 16px; 
-            border: none; 
-            background: var(--accent); 
-            color: #000; 
-            font-weight: 800; 
-            font-size: 1.1rem; 
-            cursor: pointer; 
-            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-            transition: transform 0.1s;
+            padding: 18px 45px; border-radius: 16px; border: none; background: var(--accent); 
+            color: #000; font-weight: 800; font-size: 1.1rem; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
         }
-
-        button:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
 
     <div id="scanner-container">
         <video id="camera" autoplay playsinline></video>
-        
         <div id="overlay">
-            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
-            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
+            <div class="grid-cell"><div class="sensor-dot"></div></div>
         </div>
-
         <div id="mini-preview"></div>
-
         <div class="info-panel">
-            <div class="instruction-text">
-                Posicione a face:
-                <span id="face-name" class="target-face">BRANCA (Topo)</span>
-            </div>
+            <div class="instruction-text">Aponte para a face: <span id="face-name" class="target-face">BRANCA (Topo)</span></div>
             <button onclick="captureCurrentFace()">CAPTURAR FACE</button>
         </div>
     </div>
@@ -155,8 +72,8 @@
         let currentStep = 0;
         let cubeState = {};
 
-        // --- MINI PREVIEW 3D ---
         let miniScene, miniCamera, miniRenderer, miniCubeGroup;
+        const sensorDots = document.querySelectorAll('.sensor-dot');
 
         function initMini3D() {
             const container = document.getElementById('mini-preview');
@@ -169,24 +86,25 @@
             miniRenderer.setSize(110, 110);
             container.appendChild(miniRenderer.domElement);
 
-            const light = new THREE.DirectionalLight(0xffffff, 1);
-            light.position.set(2, 5, 2);
-            miniScene.add(light);
-            miniScene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
+            miniScene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            
             createMiniCube();
-            rotateMiniToFace('U');
-            animateMini();
+            updateMiniRotation();
+            animate();
         }
 
         function createMiniCube() {
             miniCubeGroup = new THREE.Group();
-            const geometry = new THREE.BoxGeometry(0.92, 0.92, 0.92);
+            // Criar 27 cubinhos individuais
             for (let x = -1; x <= 1; x++) {
                 for (let y = -1; y <= 1; y++) {
                     for (let z = -1; z <= 1; z++) {
-                        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                        const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+                        // Cada cubinho tem 6 materiais (faces)
+                        const materials = Array(6).fill().map(() => new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                        const mesh = new THREE.Mesh(geometry, materials);
                         mesh.position.set(x, y, z);
+                        mesh.userData = { pos: {x, y, z} };
                         miniCubeGroup.add(mesh);
                     }
                 }
@@ -194,87 +112,113 @@
             miniScene.add(miniCubeGroup);
         }
 
-        function rotateMiniToFace(face) {
-            const rots = {
-                'U': [Math.PI/4, Math.PI/4, 0],
-                'R': [0, -Math.PI/2, 0],
-                'F': [0, 0, 0],
-                'D': [-Math.PI/2, 0, 0],
-                'L': [0, Math.PI/2, 0],
-                'B': [0, Math.PI, 0]
-            };
-            const target = rots[face];
-            miniCubeGroup.rotation.set(target[0], target[1], target[2]);
-        }
-
-        function animateMini() {
-            requestAnimationFrame(animateMini);
-            miniRenderer.render(miniScene, miniCamera);
-        }
-
-        // --- CAMERA E CAPTURA ---
         async function setupCamera() {
             const video = document.getElementById('camera');
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', focusMode: 'continuous' }, 
-                    audio: false 
-                });
-                video.srcObject = stream;
-            } catch (err) {
-                alert("Permissão de câmera negada ou erro: " + err);
-            }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
         }
 
-        function captureCurrentFace() {
+        // Analisa cores em tempo real para os pontinhos
+        function liveSensorUpdate() {
             const video = document.getElementById('camera');
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
-
-            // Coleta de cores
-            const colors = analyzeColors(canvas, ctx);
-            cubeState[faces[currentStep]] = colors;
-
-            currentStep++;
-            if (currentStep < faces.length) {
-                document.getElementById('face-name').innerText = faceNames[currentStep];
-                rotateMiniToFace(faces[currentStep]);
-            } else {
-                alert("Todas as faces capturadas! Pronto para resolver.");
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                
+                const colors = getColorsFromCanvas(canvas, ctx);
+                sensorDots.forEach((dot, i) => {
+                    dot.style.background = colors[i];
+                });
             }
+            requestAnimationFrame(liveSensorUpdate);
         }
 
-        function analyzeColors(canvas, ctx) {
+        function getColorsFromCanvas(canvas, ctx) {
             const overlay = document.getElementById('overlay').getBoundingClientRect();
             const videoEl = document.getElementById('camera').getBoundingClientRect();
-            
             const scaleX = canvas.width / videoEl.width;
             const scaleY = canvas.height / videoEl.height;
-
             const startX = (overlay.left - videoEl.left) * scaleX;
             const startY = (overlay.top - videoEl.top) * scaleY;
             const stepX = (overlay.width / 3) * scaleX;
             const stepY = (overlay.height / 3) * scaleY;
 
-            let faceColors = [];
+            let colors = [];
             for (let r = 0; r < 3; r++) {
                 for (let c = 0; c < 3; c++) {
                     const x = startX + (c + 0.5) * stepX;
                     const y = startY + (r + 0.5) * stepY;
                     const p = ctx.getImageData(x, y, 1, 1).data;
-                    faceColors.push(`rgb(${p[0]},${p[1]},${p[2]})`);
+                    colors.push(`rgb(${p[0]},${p[1]},${p[2]})`);
                 }
             }
-            return faceColors;
+            return colors;
         }
 
-        window.onload = () => {
-            setupCamera();
-            initMini3D();
-        };
+        function captureCurrentFace() {
+            const video = document.getElementById('camera');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            const colors = getColorsFromCanvas(canvas, ctx);
+            applyColorsToMiniCube(colors, faces[currentStep]);
+
+            currentStep++;
+            if (currentStep < faces.length) {
+                document.getElementById('face-name').innerText = faceNames[currentStep];
+                updateMiniRotation();
+            } else {
+                alert("Captura finalizada!");
+            }
+        }
+
+        function applyColorsToMiniCube(colors, faceCode) {
+            miniCubeGroup.children.forEach(cube => {
+                const p = cube.userData.pos;
+                let colorIndex = -1;
+                
+                // Mapeia qual cubinho da face 3x3 corresponde ao array de 9 cores
+                if (faceCode === 'U' && p.y === 1) { // Topo
+                    colorIndex = (1 - p.z) * 3 + (p.x + 1);
+                    cube.material[2].color.set(colors[colorIndex]); // Material index para Up
+                } else if (faceCode === 'F' && p.z === 1) { // Frente
+                    colorIndex = (1 - p.y) * 3 + (p.x + 1);
+                    cube.material[4].color.set(colors[colorIndex]);
+                } else if (faceCode === 'R' && p.x === 1) { // Direita
+                    colorIndex = (1 - p.y) * 3 + (1 - p.z);
+                    cube.material[0].color.set(colors[colorIndex]);
+                } else if (faceCode === 'L' && p.x === -1) { // Esquerda
+                    colorIndex = (1 - p.y) * 3 + (p.z + 1);
+                    cube.material[1].color.set(colors[colorIndex]);
+                } else if (faceCode === 'D' && p.y === -1) { // Baixo
+                    colorIndex = (p.z + 1) * 3 + (p.x + 1);
+                    cube.material[3].color.set(colors[colorIndex]);
+                } else if (faceCode === 'B' && p.z === -1) { // Trás
+                    colorIndex = (1 - p.y) * 3 + (1 - p.x);
+                    cube.material[5].color.set(colors[colorIndex]);
+                }
+            });
+        }
+
+        function updateMiniRotation() {
+            const rots = {
+                'U': [0.5, 0.5, 0], 'R': [0, -Math.PI/2, 0], 'F': [0, 0, 0],
+                'D': [-Math.PI/2, 0, 0], 'L': [0, Math.PI/2, 0], 'B': [0, Math.PI, 0]
+            };
+            const r = rots[faces[currentStep]];
+            miniCubeGroup.rotation.set(r[0], r[1], r[2]);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            miniRenderer.render(miniScene, miniCamera);
+        }
+
+        window.onload = () => { setupCamera(); initMini3D(); liveSensorUpdate(); };
     </script>
 </body>
 </html>
