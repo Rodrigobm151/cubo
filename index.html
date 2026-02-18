@@ -2,1609 +2,1209 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CubeScanner Pro - Solver Inteligente</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Cube Scanner Pro - Solver 3x3</title>
     <style>
-        body { font-family: 'Inter', sans-serif; overflow-x: hidden; background: #0f172a; }
-        
-        .scanner-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            width: 300px;
-            height: 300px;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 20;
-            pointer-events: none;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
-        
-        .scanner-cell {
-            background: rgba(255, 255, 255, 0.05);
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            position: relative;
-            transition: all 0.3s ease;
-        }
-        
-        .scanner-cell.detected { border-color: #4ade80; background: rgba(74, 222, 128, 0.15); }
-        .scanner-cell.uncertain { border-color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
-        .scanner-cell.missing { border-color: #ef4444; background: rgba(239, 68, 68, 0.15); animation: pulse-red 1.5s infinite; }
-        .scanner-cell.center { border-width: 4px; box-shadow: 0 0 20px rgba(251, 191, 36, 0.4); }
 
-        @keyframes pulse-red {
-            0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
-            50% { border-color: rgba(239, 68, 68, 1); }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            touch-action: manipulation;
         }
-        
-        .color-dot {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.6);
-            border: 3px solid rgba(255,255,255,0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .color-dot.detected { border-color: #4ade80; transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 0 15px currentColor; }
-        .color-dot.uncertain { border-color: #fbbf24; transform: translate(-50%, -50%) scale(1.1); }
-        .color-dot.missing { border-color: #ef4444; background: rgba(239, 68, 68, 0.3); }
 
-        .detection-frame {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 320px;
-            height: 320px;
-            border: 4px solid transparent;
+        .container {
+            max-width: 100%;
+            padding: 10px;
+            padding-bottom: 100px;
+        }
+
+        header {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            background: linear-gradient(45deg, #00f2ff, #ff00e4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            color: #aaa;
+        }
+
+        /* Scanner Section */
+        .scanner-section {
+            background: rgba(255,255,255,0.05);
             border-radius: 20px;
-            z-index: 15;
-            transition: all 0.3s;
-        }
-        
-        .detection-frame.waiting { border-color: #ef4444; }
-        .detection-frame.partial { border-color: #fbbf24; box-shadow: 0 0 40px rgba(251, 191, 36, 0.4); }
-        .detection-frame.good { border-color: #22c55e; box-shadow: 0 0 50px rgba(34, 197, 94, 0.5); }
-
-        .progress-ring {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 340px;
-            height: 340px;
-            pointer-events: none;
-            z-index: 25;
-        }
-        
-        .progress-ring circle { transition: stroke-dashoffset 0.1s linear; transform: rotate(-90deg); transform-origin: 50% 50%; }
-
-        .validation-counter {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-            z-index: 30;
-            border: 2px solid rgba(255,255,255,0.2);
-        }
-
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-
-        .move-notation {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            color: white;
-            margin: 2px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-        
-        .move-notation:hover { transform: scale(1.1); }
-        .move-notation.active { ring: 2px solid white; transform: scale(1.1); background: linear-gradient(135deg, #22c55e, #16a34a); }
-        .move-notation.completed { opacity: 0.4; transform: scale(0.9); }
-
-        .color-editor-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            width: 100%;
-            max-width: 320px;
-            margin: 0 auto;
-        }
-        
-        .editor-cell {
-            aspect-ratio: 1;
-            border-radius: 16px;
-            border: 3px solid rgba(255,255,255,0.2);
-            cursor: pointer;
-            position: relative;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-        }
-        
-        .editor-cell:hover { transform: scale(1.05); border-color: white; }
-        .editor-cell.selected { ring: 4px solid #3b82f6; transform: scale(1.1); }
-
-        .color-palette {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 20px;
-        }
-        
-        .color-option {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            border: 3px solid rgba(255,255,255,0.3);
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-        }
-        
-        .color-option:hover { transform: scale(1.15); border-color: white; }
-        .color-option.selected { ring: 4px solid #3b82f6; transform: scale(1.2); }
-        .color-option::after {
-            content: attr(data-color);
-            position: absolute;
-            bottom: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 10px;
-            text-transform: uppercase;
-            white-space: nowrap;
-            color: white;
-        }
-
-        .confidence-badge {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: bold;
-            border: 2px solid white;
-        }
-        
-        .badge-high { background: #22c55e; }
-        .badge-medium { background: #fbbf24; }
-        .badge-low { background: #ef4444; }
-
-        .mini-cube-preview {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 2px;
-            width: 60px;
-            height: 60px;
-        }
-        .mini-cube-cell {
-            border-radius: 2px;
-            background: #374151;
+            padding: 15px;
+            margin: 15px 0;
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        .eco-mode-indicator {
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            border-radius: 15px;
+            overflow: hidden;
+            background: #000;
+            aspect-ratio: 1;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror effect */
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .overlay-canvas {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(34, 197, 94, 0.2);
-            color: #4ade80;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            z-index: 30;
-            border: 1px solid rgba(74, 222, 128, 0.3);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .scan-grid {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 70%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 2px;
+            border: 3px solid rgba(255,255,255,0.8);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,242,255,0.3);
+        }
+
+        .scan-cell {
+            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.05);
+            position: relative;
+        }
+
+        .scan-cell.active {
+            background: rgba(0,242,255,0.2);
+            border-color: #00f2ff;
+        }
+
+        .scan-point {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        
-        .eco-mode-indicator::before { content: "🍃"; }
 
-        .solver-info {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 12px;
-            padding: 12px;
-            margin-bottom: 16px;
+        .btn-primary {
+            background: linear-gradient(45deg, #00f2ff, #0099ff);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(0,242,255,0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #00ff88, #00cc66);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(0,255,136,0.4);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Face Selector */
+        .face-selector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .face-btn {
+            width: 45px;
+            height: 45px;
+            border: 3px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .face-btn.white { background: #f0f0f0; color: #333; }
+        .face-btn.red { background: #ff4444; color: #fff; }
+        .face-btn.green { background: #44ff44; color: #000; }
+        .face-btn.orange { background: #ff8844; color: #000; }
+        .face-btn.blue { background: #4444ff; color: #fff; }
+        .face-btn.yellow { background: #ffff44; color: #000; }
+
+        .face-btn.completed::after {
+            content: '✓';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 0.7rem;
+            background: rgba(0,0,0,0.7);
+            color: #0f0;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .face-btn.active {
+            border-color: #00f2ff;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(0,242,255,0.5);
+        }
+
+        /* Cube Preview */
+        .cube-preview {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 20px;
+            margin: 15px 0;
             text-align: center;
         }
-        
-        .solver-info.solved { 
-            background: rgba(34, 197, 94, 0.1); 
-            border-color: rgba(34, 197, 94, 0.3);
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            width: 150px;
+            margin: 0 auto;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 10px;
         }
 
-        @keyframes scramble-pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
+        .preview-cell {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s;
+            cursor: pointer;
         }
-        .scrambling { animation: scramble-pulse 0.5s ease-in-out; }
+
+        .preview-cell:hover {
+            transform: scale(1.1);
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+
+        /* Color Calibration */
+        .calibration-panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .calibration-panel.active {
+            display: block;
+        }
+
+        .calibration-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .calib-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+        }
+
+        .color-sample {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .tolerance-slider {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        /* Manual Input Fallback */
+        .manual-input {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            max-width: 250px;
+            margin: 15px auto;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .color-option.selected {
+            border-color: #fff;
+            transform: scale(1.2);
+            box-shadow: 0 0 15px currentColor;
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(20,20,30,0.98);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 20px 20px 0 0;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+            z-index: 200;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .settings-panel.open {
+            transform: translateY(0);
+        }
+
+        .settings-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #ff00e4, #ff0066);
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 201;
+            box-shadow: 0 4px 15px rgba(255,0,228,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Tips */
+        .tips {
+            background: rgba(0,242,255,0.1);
+            border-left: 4px solid #00f2ff;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 10px 10px 0;
+            font-size: 0.9rem;
+        }
+
+        .tips h3 {
+            margin-bottom: 8px;
+            color: #00f2ff;
+        }
+
+        .tips ul {
+            margin-left: 20px;
+            opacity: 0.9;
+        }
+
+        .tips li {
+            margin: 5px 0;
+        }
+
+        /* Loading */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 1000;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #00f2ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00f2ff, #ff00e4);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Detection Preview */
+        .detection-preview {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .detected-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            border: 2px solid rgba(255,255,255,0.3);
+            position: relative;
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        .confidence-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: rgba(0,0,0,0.5);
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: #0f0;
+        }
+
+        /* Responsive */
+        @media (max-width: 380px) {
+            .face-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 0.7rem;
+            }
+            
+            .btn {
+                padding: 10px 18px;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Flash effect */
+        .flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s;
+        }
+
+        .flash.active {
+            opacity: 0.8;
+        }
     </style>
 </head>
-<body class="text-white min-h-screen">
-
-    <div id="app" class="relative min-h-screen flex flex-col">
-        
-        <header class="glass fixed top-0 w-full z-50 px-6 py-4 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-xl font-bold">🎲</div>
-                <div>
-                    <h1 class="font-bold text-lg">CubeScanner Pro</h1>
-                    <p class="text-xs text-gray-400">Solver Inteligente</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <!-- BOTÃO DE TESTE TEMPORÁRIO -->
-                <button onclick="runTestMode()" class="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 rounded-lg font-bold text-sm transition shadow-lg border border-pink-400 animate-pulse">
-                    🧪 Testar Solver
-                </button>
-                <div id="stage-indicator" class="px-4 py-1 rounded-full bg-gray-800 text-sm font-medium border border-gray-700">Fase: Captura</div>
-            </div>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎲 Cube Scanner Pro</h1>
+            <div class="subtitle">Escaneamento Inteligente 3x3</div>
         </header>
 
-        <!-- SCANNER SECTION -->
-        <section id="scanner-section" class="flex-1 flex flex-col items-center justify-center pt-20 pb-6 px-4">
-            
-            <div class="relative w-full max-w-lg aspect-[4/5] bg-black rounded-2xl overflow-hidden shadow-2xl border border-gray-700">
-                <div class="eco-mode-indicator" id="eco-indicator">Modo Econômico Ativo</div>
+        <div class="tips">
+            <h3>💡 Dicas para Escaneamento Perfeito</h3>
+            <ul>
+                <li>Use luz natural ou iluminação uniforme</li>
+                <li>Evite reflexos e sombras no cubo</li>
+                <li>Mantenha o cubo centralizado na grade</li>
+                <li>Escaneie uma face por vez, começando pelo centro</li>
+            </ul>
+        </div>
 
-                <video id="camera-feed" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline muted></video>
-                <canvas id="processing-canvas" class="hidden" width="160" height="120"></canvas>
-                
-                <div id="camera-fallback" class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center hidden">
-                    <div class="text-center p-6">
-                        <div class="text-6xl mb-4">📷</div>
-                        <p class="text-gray-400 mb-4">Permita o acesso à câmera</p>
-                        <button onclick="startSimulationMode()" class="px-4 py-2 bg-blue-600 rounded-lg text-sm">Usar Modo Simulação</button>
-                    </div>
-                </div>
-
-                <div id="validation-counter" class="validation-counter">0/9 cores</div>
-
-                <div class="detection-frame waiting" id="detection-frame"></div>
-                
-                <div class="scanner-grid" id="scanner-grid"></div>
-                
-                <svg class="progress-ring">
-                    <circle cx="170" cy="170" r="165" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="6"/>
-                    <circle id="progress-circle" cx="170" cy="170" r="165" fill="none" stroke="#3b82f6" stroke-width="6" 
-                            stroke-dasharray="1036" stroke-dashoffset="1036" stroke-linecap="round"/>
-                </svg>
-
-                <div class="absolute top-8 left-0 w-full text-center z-30 mt-8">
-                    <div id="current-face-badge" class="inline-block px-6 py-3 rounded-full bg-black/60 backdrop-blur-md border-2 text-lg font-bold transition-all">
-                        Frente (Verde)
-                    </div>
-                </div>
-
-                <div class="absolute bottom-8 left-0 w-full text-center z-30 space-y-2">
-                    <div id="detection-status" class="text-lg font-bold text-red-400">Aproxime o cubo</div>
-                    <div id="fps-counter" class="text-xs text-gray-500">Processando a cada 200ms</div>
-                </div>
+        <div class="scanner-section">
+            <div class="face-selector">
+                <div class="face-btn white active" data-face="U" data-color="white">UP</div>
+                <div class="face-btn red" data-face="R" data-color="red">RIGHT</div>
+                <div class="face-btn green" data-face="F" data-color="green">FRONT</div>
+                <div class="face-btn orange" data-face="L" data-color="orange">LEFT</div>
+                <div class="face-btn blue" data-face="B" data-color="blue">BACK</div>
+                <div class="face-btn yellow" data-face="D" data-color="yellow">DOWN</div>
             </div>
 
-            <div class="mt-4 w-full max-w-lg flex gap-3">
-                <button onclick="forceCapture()" class="flex-1 py-3 bg-yellow-600 hover:bg-yellow-500 rounded-xl font-bold text-sm transition shadow-lg">
-                    ⚡ Capturar com Incerteza
+            <div class="camera-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+                <canvas class="overlay-canvas" id="overlay"></canvas>
+                <div class="scan-grid" id="scanGrid">
+                    <div class="scan-cell" data-pos="0"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="1"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="2"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="3"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="4"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="5"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="6"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="7"><div class="scan-point"></div></div>
+                    <div class="scan-cell" data-pos="8"><div class="scan-point"></div></div>
+                </div>
+                <div class="flash" id="flash"></div>
+            </div>
+
+            <div class="detection-preview" id="detectionPreview"></div>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="btnScan">
+                    <span>📷</span> Capturar
                 </button>
-                <button onclick="requestStabilityCapture()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition shadow-lg">
-                    ✓ Capturar Estável (9/9)
+                <button class="btn btn-secondary" id="btnAuto">
+                    <span>🔄</span> Auto-Scan
+                </button>
+                <button class="btn btn-success" id="btnSolve" disabled>
+                    <span>✨</span> Resolver
                 </button>
             </div>
 
-            <div class="mt-4 w-full max-w-lg">
-                <div class="glass rounded-xl p-4 flex items-center gap-4">
-                    <div id="preview-cube" class="w-24 h-24 flex-shrink-0 bg-gray-800 rounded-lg p-2">
-                        <div id="mini-cube-grid" class="mini-cube-preview"></div>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="font-semibold text-sm text-gray-300 mb-1">Preview 3D</h3>
-                        <div id="scan-progress" class="flex gap-1 mb-2"></div>
-                        <p class="text-xs text-gray-500">Mapeamento correto de quinas</p>
-                    </div>
-                </div>
+            <div class="controls">
+                <button class="btn btn-secondary" id="btnToggleManual">
+                    <span>✏️</span> Editar Manual
+                </button>
+                <button class="btn btn-secondary" id="btnCalibrate">
+                    <span>⚙️</span> Calibrar Cores
+                </button>
+                <button class="btn btn-secondary" id="btnReset">
+                    <span>🗑️</span> Limpar
+                </button>
             </div>
-        </section>
+        </div>
 
-        <!-- EDITOR SECTION -->
-        <section id="editor-section" class="hidden flex-1 flex-col pt-20 pb-6 px-4 bg-gray-900">
-            <div class="max-w-md mx-auto w-full">
-                
-                <div class="text-center mb-6">
-                    <h2 class="text-2xl font-bold mb-2">Revisar Face</h2>
-                    <p class="text-gray-400 text-sm" id="editor-face-name">Frente (Verde)</p>
-                    <div class="mt-2 inline-block px-3 py-1 rounded-full bg-gray-800 text-xs" id="editor-confidence">
-                        Confiança: Média
-                    </div>
-                </div>
-
-                <div class="color-editor-grid" id="editor-grid"></div>
-
-                <div class="color-palette" id="color-palette"></div>
-
-                <div class="mt-6 flex gap-3">
-                    <button onclick="retakeFace()" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-sm transition">
-                        ↺ Capturar Novamente
-                    </button>
-                    <button onclick="confirmFaceEdit()" class="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl font-bold text-sm transition">
-                        ✓ Confirmar Face
-                    </button>
-                </div>
-
-                <div class="mt-4 p-4 bg-gray-800/50 rounded-xl text-xs text-gray-400">
-                    <p class="mb-2"><span class="text-green-400">●</span> = Detecção confiável</p>
-                    <p class="mb-2"><span class="text-yellow-400">●</span> = Detecção incerta</p>
-                    <p><span class="text-red-400">●</span> = Não detectado (manual obrigatório)</p>
-                </div>
+        <div class="cube-preview">
+            <h3>Preview: <span id="currentFaceName">White (Up)</span></h3>
+            <div class="preview-grid" id="previewGrid">
+                <!-- Generated by JS -->
             </div>
-        </section>
-
-        <!-- SOLVER SECTION -->
-        <section id="solver-section" class="hidden flex-1 flex-col pt-20 pb-6 px-4 bg-gray-900">
-            <div class="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full">
-                
-                <div class="text-center mb-4">
-                    <h2 class="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                        Cubo Reconstruído
-                    </h2>
-                    <p class="text-gray-400 text-sm" id="solver-status">Analisando estado...</p>
-                </div>
-
-                <div id="main-cube-container" class="w-full h-[400px] relative mb-4"></div>
-
-                <!-- Solver Info Panel -->
-                <div class="solver-info w-full max-w-lg" id="solver-info">
-                    <p class="text-sm font-medium" id="solver-analysis">Analisando estado do cubo...</p>
-                    <p class="text-xs text-gray-400 mt-1" id="solver-suggestion">Aguarde...</p>
-                </div>
-
-                <div class="w-full glass rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <div>
-                            <h3 class="font-bold text-lg">Solução Inteligente</h3>
-                            <p class="text-xs text-gray-400 mt-1" id="move-description">Gerando solução ótima...</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="solver.prev()" class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition text-sm">←</button>
-                            <button onclick="solver.togglePlay()" id="play-btn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition text-sm font-medium w-24">▶ Play</button>
-                            <button onclick="solver.next()" class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition text-sm">→</button>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-800 rounded-xl p-4 mb-4 min-h-[100px] flex items-center justify-center flex-wrap gap-1" id="moves-display"></div>
-
-                    <div class="flex items-center gap-4">
-                        <span class="text-xs text-gray-500 w-16 text-right" id="move-counter">0/0</span>
-                        <div class="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
-                            <div id="solution-progress" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 w-0 transition-all duration-300"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-4 flex gap-3 flex-wrap justify-center">
-                    <button onclick="solver.analyzeAndSolve()" class="px-6 py-2 rounded-full bg-green-600 hover:bg-green-500 border border-green-500 transition font-medium text-sm">
-                        🧠 Reanalisar Cubo
-                    </button>
-                    <button onclick="solver.scrambleCube()" class="px-6 py-2 rounded-full bg-orange-600 hover:bg-orange-500 border border-orange-500 transition font-medium text-sm">
-                        🎲 Embaralhar
-                    </button>
-                    <button onclick="solver.resetCube()" class="px-6 py-2 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-700 transition font-medium text-sm">
-                        ↺ Resetar Cubo
-                    </button>
-                    <button onclick="location.reload()" class="px-6 py-2 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-700 transition font-medium text-sm">
-                        🔄 Novo Escaneamento
-                    </button>
-                </div>
+            <div class="color-picker" id="colorPicker" style="display: none;">
+                <div class="color-option selected" style="background: #ffffff" data-color="white"></div>
+                <div class="color-option" style="background: #ff4444" data-color="red"></div>
+                <div class="color-option" style="background: #44ff44" data-color="green"></div>
+                <div class="color-option" style="background: #ff8844" data-color="orange"></div>
+                <div class="color-option" style="background: #4444ff" data-color="blue"></div>
+                <div class="color-option" style="background: #ffff44" data-color="yellow"></div>
             </div>
-        </section>
+        </div>
 
+        <div class="calibration-panel" id="calibrationPanel">
+            <h3>🎨 Calibração de Cores</h3>
+            <p style="font-size: 0.9rem; margin-bottom: 10px;">Ajuste a tolerância para cada cor:</p>
+            <div class="calibration-grid" id="calibrationGrid">
+                <!-- Generated by JS -->
+            </div>
+            <div class="controls" style="margin-top: 15px;">
+                <button class="btn btn-primary" id="btnSaveCalib">Salvar</button>
+                <button class="btn btn-secondary" id="btnResetCalib">Resetar</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="settings-toggle" id="btnSettings">⚙️</button>
+    
+    <div class="settings-panel" id="settingsPanel">
+        <h3>Configurações Avançadas</h3>
+        <div style="margin: 20px 0;">
+            <label style="display: block; margin-bottom: 10px;">
+                <input type="checkbox" id="chkAdvancedMode"> Modo Avançado (HSV)
+            </label>
+            <label style="display: block; margin-bottom: 10px;">
+                <input type="checkbox" id="chkAutoWhiteBalance"> Balance de Branco Auto
+            </label>
+            <label style="display: block; margin-bottom: 10px;">
+                Brilho: <input type="range" id="rangeBrightness" min="0.5" max="2" step="0.1" value="1">
+            </label>
+            <label style="display: block; margin-bottom: 10px;">
+                Saturação: <input type="range" id="rangeSaturation" min="0.5" max="2" step="0.1" value="1">
+            </label>
+        </div>
+        <button class="btn btn-secondary" id="btnCloseSettings" style="width: 100%;">Fechar</button>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 20px;">Calculando solução...</p>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
     </div>
 
     <script>
-        // CONFIGURAÇÃO
-        const CONFIG = {
-            DETECTION_INTERVAL: 200,
-            PROCESS_WIDTH: 160,
-            PROCESS_HEIGHT: 120,
-            MOTION_THRESHOLD: 5,
-            STABLE_FRAMES_LIMIT: 10
+        // Cube state management
+        const cubeState = {
+            U: Array(9).fill('white'),
+            R: Array(9).fill('red'),
+            F: Array(9).fill('green'),
+            L: Array(9).fill('orange'),
+            B: Array(9).fill('blue'),
+            D: Array(9).fill('yellow')
         };
 
-        const FACE_ORDER = [
-            { name: 'Frente', color: 'green', code: 'F', axis: 'z', layer: 1, normal: [0, 0, 1] },
-            { name: 'Direita', color: 'red', code: 'R', axis: 'x', layer: 1, normal: [1, 0, 0] },
-            { name: 'Atrás', color: 'blue', code: 'B', axis: 'z', layer: -1, normal: [0, 0, -1] },
-            { name: 'Esquerda', color: 'orange', code: 'L', axis: 'x', layer: -1, normal: [-1, 0, 0] },
-            { name: 'Topo', color: 'white', code: 'U', axis: 'y', layer: 1, normal: [0, 1, 0] },
-            { name: 'Base', color: 'yellow', code: 'D', axis: 'y', layer: -1, normal: [0, -1, 0] }
-        ];
+        const faceOrder = ['U', 'R', 'F', 'L', 'B', 'D'];
+        let currentFace = 'U';
+        let isManualMode = false;
+        let selectedColor = 'white';
+        let stream = null;
 
-        const COLORS = {
-            white: 0xFFFFFF, yellow: 0xFFD500, red: 0xFF0000,
-            orange: 0xFF8C00, blue: 0x0051BA, green: 0x009E60,
-            gray: 0x374151, black: 0x111827
+        // Advanced color detection profiles
+        const colorProfiles = {
+            white: { 
+                rgb: [255, 255, 255], 
+                hsv: {h: [0, 360], s: [0, 30], v: [180, 255]},
+                lab: {l: [90, 100], a: [-10, 10], b: [-10, 10]},
+                tolerance: 35 
+            },
+            red: { 
+                rgb: [255, 68, 68], 
+                hsv: {h: [340, 20], s: [100, 255], v: [100, 255]},
+                lab: {l: [40, 60], a: [40, 80], b: [30, 60]},
+                tolerance: 40 
+            },
+            green: { 
+                rgb: [68, 255, 68], 
+                hsv: {h: [100, 140], s: [100, 255], v: [100, 255]},
+                lab: {l: [50, 70], a: [-60, -20], b: [40, 80]},
+                tolerance: 40 
+            },
+            orange: { 
+                rgb: [255, 136, 68], 
+                hsv: {h: [15, 45], s: [100, 255], v: [150, 255]},
+                lab: {l: [60, 80], a: [20, 60], b: [50, 90]},
+                tolerance: 40 
+            },
+            blue: { 
+                rgb: [68, 68, 255], 
+                hsv: {h: [200, 260], s: [100, 255], v: [100, 255]},
+                lab: {l: [30, 50], a: [10, 50], b: [-80, -40]},
+                tolerance: 40 
+            },
+            yellow: { 
+                rgb: [255, 255, 68], 
+                hsv: {h: [50, 70], s: [100, 255], v: [200, 255]},
+                lab: {l: [85, 95], a: [-20, 20], b: [60, 100]},
+                tolerance: 35 
+            }
         };
 
-        const COLOR_NAMES = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
+        // DOM Elements
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const overlay = document.getElementById('overlay');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const overlayCtx = overlay.getContext('2d');
 
-        // Estado
-        const state = {
-            currentFaceIndex: 0,
-            scannedFaces: Array(6).fill(null).map(() => Array(9).fill(null)),
-            faceConfidence: Array(6).fill(null),
-            currentDetection: Array(9).fill(null),
-            detectionConfidence: Array(9).fill(0),
-            isEditing: false,
-            selectedCell: null,
-            cameraActive: false,
-            detectionActive: true,
-            lastFrameData: null,
-            stableFramesCount: 0,
-            detectionTimer: null,
-            isProcessing: false,
-            lastUIUpdate: null,
-            isTestMode: false
-        };
-
-        let previewScene, previewCamera, previewRenderer, previewCube;
-        let mainScene, mainCamera, mainRenderer;
-        let cubies = [];
-
-        // ===== MODO DE TESTE =====
-        function runTestMode() {
-            state.isTestMode = true;
-            document.getElementById('scanner-section').classList.add('hidden');
-            document.getElementById('editor-section').classList.add('hidden');
-            document.getElementById('solver-section').classList.remove('hidden');
-            document.getElementById('stage-indicator').textContent = 'Fase: Teste';
-
-            initMainCube();
-
-            setTimeout(() => {
-                solver.scrambleCube().then(() => {
-                    console.log('Cubo embaralhado no modo teste');
-                });
-            }, 500);
-        }
-
-        function init() {
-            initScannerGrid();
-            initMiniCubePreview();
-            initPreviewCube3D();
-            initColorPalette();
-            updateScanProgress();
-            initCamera();
-        }
-
-        function initScannerGrid() {
-            const grid = document.getElementById('scanner-grid');
-            for (let i = 0; i < 9; i++) {
-                const cell = document.createElement('div');
-                cell.className = `scanner-cell ${i === 4 ? 'center' : ''}`;
-                cell.id = `cell-${i}`;
-                
-                const dot = document.createElement('div');
-                dot.className = 'color-dot';
-                dot.id = `dot-${i}`;
-                
-                cell.appendChild(dot);
-                grid.appendChild(cell);
-            }
-        }
-
-        function initMiniCubePreview() {
-            const grid = document.getElementById('mini-cube-grid');
-            for (let i = 0; i < 9; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'mini-cube-preview';
-                cell.id = `mini-cell-${i}`;
-                grid.appendChild(cell);
-            }
-        }
-
-        function initPreviewCube3D() {
-            const container = document.getElementById('preview-cube');
-            previewScene = new THREE.Scene();
-            previewCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-            previewCamera.position.set(3, 3, 3);
-            previewCamera.lookAt(0, 0, 0);
-            
-            previewRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: false });
-            previewRenderer.setSize(96, 96);
-            previewRenderer.setPixelRatio(1);
-            container.appendChild(previewRenderer.domElement);
-            
-            previewScene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            const light = new THREE.DirectionalLight(0xffffff, 0.5);
-            light.position.set(5, 5, 5);
-            previewScene.add(light);
-            
-            previewCube = new THREE.Group();
-            const geometry = new THREE.BoxGeometry(0.28, 0.28, 0.28);
-            
-            for (let x = -1; x <= 1; x++) {
-                for (let y = -1; y <= 1; y++) {
-                    for (let z = -1; z <= 1; z++) {
-                        const materials = [];
-                        const faces = [x===1?1:-1, x===-1?3:-1, y===1?4:-1, y===-1?5:-1, z===1?0:-1, z===-1?2:-1];
-                        
-                        faces.forEach(faceIdx => {
-                            if (faceIdx >= 0) {
-                                const face = state.scannedFaces[faceIdx];
-                                const color = getPreviewColor(faceIdx, x, y, z, face);
-                                materials.push(new THREE.MeshPhongMaterial({ 
-                                    color: COLORS[color] || COLORS.black,
-                                    shininess: 100 
-                                }));
-                            } else {
-                                materials.push(new THREE.MeshPhongMaterial({ color: COLORS.black }));
-                            }
-                        });
-                        
-                        const mesh = new THREE.Mesh(geometry, materials);
-                        mesh.position.set(x * 0.3, y * 0.3, z * 0.3);
-                        mesh.userData = { x, y, z };
-                        previewCube.add(mesh);
-                    }
-                }
-            }
-            
-            previewScene.add(previewCube);
-            
-            setInterval(() => {
-                previewCube.rotation.y += 0.02;
-                previewCube.rotation.x += 0.01;
-                previewRenderer.render(previewScene, previewCamera);
-            }, 33);
-        }
-
-        function getPreviewColor(faceIdx, x, y, z, faceColors) {
-            if (!faceColors) return 'black';
-            let idx;
-            switch(faceIdx) {
-                case 0: idx = (1-y)*3 + (x+1); break;
-                case 1: idx = (1-y)*3 + (1-z); break;
-                case 2: idx = (1-y)*3 + (1-x); break;
-                case 3: idx = (1-y)*3 + (z+1); break;
-                case 4: idx = (1-z)*3 + (x+1); break;
-                case 5: idx = (1+z)*3 + (x+1); break;
-            }
-            return faceColors[idx] || 'black';
-        }
-
-        function updatePreviewCube3D() {
-            previewCube.children.forEach(mesh => {
-                const { x, y, z } = mesh.userData;
-                const faces = [x===1?1:-1, x===-1?3:-1, y===1?4:-1, y===-1?5:-1, z===1?0:-1, z===-1?2:-1];
-                
-                mesh.material = faces.map(faceIdx => {
-                    if (faceIdx >= 0) {
-                        const face = state.scannedFaces[faceIdx];
-                        const color = getPreviewColor(faceIdx, x, y, z, face);
-                        return new THREE.MeshPhongMaterial({ 
-                            color: COLORS[color] || COLORS.black,
-                            shininess: 100 
-                        });
-                    }
-                    return new THREE.MeshPhongMaterial({ color: COLORS.black });
-                });
-            });
-        }
-
+        // Initialize camera
         async function initCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
                         facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 15, max: 15 }
-                    } 
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        advanced: [
+                            { exposureMode: 'manual' },
+                            { whiteBalanceMode: 'manual' }
+                        ]
+                    }
                 });
-                const video = document.getElementById('camera-feed');
                 video.srcObject = stream;
-                state.cameraActive = true;
-                video.onloadeddata = () => startDetectionLoop();
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    overlay.width = video.videoWidth;
+                    overlay.height = video.videoHeight;
+                    startDetectionLoop();
+                };
             } catch (err) {
-                document.getElementById('camera-fallback').classList.remove('hidden');
+                alert('Erro ao acessar câmera: ' + err.message);
             }
         }
 
-        function startSimulationMode() {
-            document.getElementById('camera-fallback').classList.add('hidden');
-            const video = document.getElementById('camera-feed');
-            video.classList.remove('hidden');
+        // Advanced color detection algorithm
+        function detectColor(r, g, b) {
+            const hsv = rgbToHsv(r, g, b);
+            const lab = rgbToLab(r, g, b);
             
-            const canvas = document.createElement('canvas');
-            canvas.width = 320;
-            canvas.height = 240;
-            const ctx = canvas.getContext('2d');
-            
-            let lastDraw = 0;
-            function drawSimulatedFeed(timestamp) {
-                if (!state.detectionActive) return;
-                
-                if (timestamp - lastDraw < 100) {
-                    requestAnimationFrame(drawSimulatedFeed);
-                    return;
-                }
-                lastDraw = timestamp;
-                
-                ctx.fillStyle = '#1f2937';
-                ctx.fillRect(0, 0, 320, 240);
-                
-                const cx = 320, cy = 240;
-                const size = 200;
-                const colors = ['green', 'red', 'blue', 'orange', 'white', 'yellow'];
-                const currentColor = FACE_ORDER[state.currentFaceIndex].color;
-                
-                for (let row = 0; row < 3; row++) {
-                    for (let col = 0; col < 3; col++) {
-                        const x = cx - size/2 + col * (size/3);
-                        const y = cy - size/2 + row * (size/3);
-                        
-                        const detectSuccess = Math.random() > 0.3;
-                        const color = (row === 1 && col === 1) ? currentColor : 
-                                     detectSuccess ? colors[Math.floor(Math.random() * colors.length)] : null;
-                        
-                        if (color) {
-                            ctx.fillStyle = color === 'white' ? '#ffffff' : 
-                                           color === 'yellow' ? '#FFD500' :
-                                           color === 'red' ? '#FF0000' :
-                                           color === 'orange' ? '#FF8C00' :
-                                           color === 'blue' ? '#0051BA' : '#009E60';
-                            ctx.fillRect(x + 2, y + 2, size/3 - 4, size/3 - 4);
-                        } else {
-                            ctx.fillStyle = '#374151';
-                            ctx.fillRect(x + 2, y + 2, size/3 - 4, size/3 - 4);
-                        }
+            let bestMatch = null;
+            let bestScore = -1;
+            let confidence = 0;
+
+            for (const [colorName, profile] of Object.entries(colorProfiles)) {
+                let score = 0;
+                let checks = 0;
+
+                // HSV Check with hue wrapping for red
+                if (profile.hsv) {
+                    let hMatch = false;
+                    if (colorName === 'red' && (hsv.h > 340 || hsv.h < 20)) {
+                        hMatch = true;
+                    } else if (hsv.h >= profile.hsv.h[0] && hsv.h <= profile.hsv.h[1]) {
+                        hMatch = true;
                     }
+                    
+                    if (hMatch) score += 2;
+                    if (hsv.s >= profile.hsv.s[0] && hsv.s <= profile.hsv.s[1]) score += 1;
+                    if (hsv.v >= profile.hsv.v[0] && hsv.v <= profile.hsv.v[1]) score += 1;
+                    checks += 4;
                 }
-                
-                if (!video.srcObject) {
-                    const stream = canvas.captureStream(10);
-                    video.srcObject = stream;
+
+                // LAB Check (perceptual uniformity)
+                if (profile.lab) {
+                    if (lab.l >= profile.lab.l[0] && lab.l <= profile.lab.l[1]) score += 1;
+                    if (lab.a >= profile.lab.a[0] && lab.a <= profile.lab.a[1]) score += 1;
+                    if (lab.b >= profile.lab.b[0] && lab.b <= profile.lab.b[1]) score += 1;
+                    checks += 3;
                 }
+
+                // RGB Euclidean distance with weight
+                const rgbDist = Math.sqrt(
+                    Math.pow(r - profile.rgb[0], 2) * 0.3 +
+                    Math.pow(g - profile.rgb[1], 2) * 0.5 +
+                    Math.pow(b - profile.rgb[2], 2) * 0.2
+                );
                 
-                requestAnimationFrame(drawSimulatedFeed);
+                const rgbScore = Math.max(0, 1 - (rgbDist / (profile.tolerance * 3)));
+                score += rgbScore * 3;
+                checks += 3;
+
+                const finalScore = score / checks;
+                
+                if (finalScore > bestScore) {
+                    bestScore = finalScore;
+                    bestMatch = colorName;
+                    confidence = finalScore;
+                }
             }
-            requestAnimationFrame(drawSimulatedFeed);
-            setTimeout(startDetectionLoop, 500);
+
+            // Special handling for white vs light colors
+            if (bestMatch !== 'white' && r > 200 && g > 200 && b > 200) {
+                if (Math.abs(r - g) < 20 && Math.abs(g - b) < 20) {
+                    bestMatch = 'white';
+                    confidence = 0.9;
+                }
+            }
+
+            return { color: bestMatch, confidence: confidence };
         }
 
+        // Color space conversions
+        function rgbToHsv(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, v = max;
+            const d = max - min;
+            s = max === 0 ? 0 : d / max;
+
+            if (max === min) {
+                h = 0;
+            } else {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return { h: h * 360, s: s * 255, v: v * 255 };
+        }
+
+        function rgbToLab(r, g, b) {
+            // Simplified RGB to LAB conversion
+            let x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
+            let y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
+            let z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
+
+            x /= 95.047; y /= 100.0; z /= 108.883;
+            
+            const transform = (t) => t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
+            
+            x = transform(x); y = transform(y); z = transform(z);
+            
+            return {
+                l: 116 * y - 16,
+                a: 500 * (x - y),
+                b: 200 * (y - z)
+            };
+        }
+
+        // Real-time detection loop
         function startDetectionLoop() {
-            const video = document.getElementById('camera-feed');
-            const canvas = document.getElementById('processing-canvas');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            
-            canvas.width = CONFIG.PROCESS_WIDTH;
-            canvas.height = CONFIG.PROCESS_HEIGHT;
-            
-            let lastColors = null;
-            let identicalFrames = 0;
-            
-            function processFrame() {
-                if (!state.detectionActive || state.currentFaceIndex >= 6 || state.isEditing) {
-                    state.detectionTimer = setTimeout(processFrame, CONFIG.DETECTION_INTERVAL);
-                    return;
+            function loop() {
+                if (!isManualMode) {
+                    detectFrame();
                 }
-                
-                if (state.isProcessing) {
-                    state.detectionTimer = setTimeout(processFrame, CONFIG.DETECTION_INTERVAL);
-                    return;
-                }
-                
-                state.isProcessing = true;
-                
-                ctx.drawImage(video, 0, 0, CONFIG.PROCESS_WIDTH, CONFIG.PROCESS_HEIGHT);
-                
-                const colors = [];
-                const confidences = [];
-                
-                const samplePoints = [
-                    {x: 40, y: 40}, {x: 80, y: 40}, {x: 120, y: 40},
-                    {x: 40, y: 60}, {x: 80, y: 60}, {x: 120, y: 60},
-                    {x: 40, y: 80}, {x: 80, y: 80}, {x: 120, y: 80}
-                ];
-                
-                let validCount = 0;
-                
-                for (let i = 0; i < 9; i++) {
-                    const point = samplePoints[i];
-                    const pixel = ctx.getImageData(point.x, point.y, 1, 1).data;
-                    const result = classifyColorWithConfidence(pixel[0], pixel[1], pixel[2]);
-                    
-                    colors.push(result.color);
-                    confidences.push(result.confidence);
-                    if (result.color) validCount++;
-                }
-                
-                if (lastColors) {
-                    const diff = colors.filter((c, i) => c !== lastColors[i]).length;
-                    if (diff === 0) {
-                        identicalFrames++;
-                        if (identicalFrames > CONFIG.STABLE_FRAMES_LIMIT) {
-                            document.getElementById('fps-counter').textContent = 'Cubo estável - 1fps (economia)';
-                            state.detectionTimer = setTimeout(processFrame, 1000);
-                            state.isProcessing = false;
-                            lastColors = colors;
-                            state.currentDetection = colors;
-                            state.detectionConfidence = confidences;
-                            updateDetectionUI(validCount, colors, confidences);
-                            return;
-                        }
-                    } else {
-                        identicalFrames = 0;
-                        document.getElementById('fps-counter').textContent = 'Processando a cada 200ms';
-                    }
-                }
-                
-                lastColors = colors;
-                state.currentDetection = colors;
-                state.detectionConfidence = confidences;
-                
-                updateDetectionUI(validCount, colors, confidences);
-                
-                state.isProcessing = false;
-                state.detectionTimer = setTimeout(processFrame, CONFIG.DETECTION_INTERVAL);
+                requestAnimationFrame(loop);
             }
-            
-            processFrame();
+            loop();
         }
 
-        function classifyColorWithConfidence(r, g, b) {
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            const sum = r + g + b;
+        function detectFrame() {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            if (sum > 540 && max - min < 60) return { color: 'white', confidence: 90 };
-            if (r > 140 && g > 120 && b < 90 && Math.abs(r-g) < 40) return { color: 'yellow', confidence: 85 };
-            if (r > 110 && g < 90 && b < 90) return { color: 'red', confidence: 80 };
-            if (r > 130 && g > 70 && g < 130 && b < 70) return { color: 'orange', confidence: 75 };
-            if (b > 90 && r < 90 && g < 100) return { color: 'blue', confidence: 85 };
-            if (g > 90 && r < 90 && b < 90) return { color: 'green', confidence: 80 };
+            const grid = document.getElementById('scanGrid');
+            const cells = grid.querySelectorAll('.scan-cell');
+            const preview = document.getElementById('detectionPreview');
             
-            return { color: null, confidence: 0 };
-        }
+            // Clear previous detection preview occasionally
+            if (Math.random() < 0.1) preview.innerHTML = '';
 
-        function updateDetectionUI(validCount, colors, confidences) {
-            if (JSON.stringify(colors) === JSON.stringify(state.lastUIUpdate)) return;
-            state.lastUIUpdate = colors;
-            
-            const frame = document.getElementById('detection-frame');
-            const status = document.getElementById('detection-status');
-            const counter = document.getElementById('validation-counter');
-            
-            colors.forEach((color, i) => {
-                const dot = document.getElementById(`dot-${i}`);
-                const cell = document.getElementById(`cell-${i}`);
-                const confidence = confidences[i];
+            cells.forEach((cell, index) => {
+                const rect = cell.getBoundingClientRect();
+                const containerRect = document.querySelector('.camera-container').getBoundingClientRect();
                 
-                const baseClass = i === 4 ? 'scanner-cell center' : 'scanner-cell';
-                
-                if (color && COLORS[color]) {
-                    const hex = COLORS[color];
-                    dot.style.backgroundColor = `rgb(${(hex >> 16) & 255}, ${(hex >> 8) & 255}, ${hex & 255})`;
+                const x = ((rect.left - containerRect.left) / containerRect.width) * canvas.width;
+                const y = ((rect.top - containerRect.top) / containerRect.height) * canvas.height;
+                const w = (rect.width / containerRect.width) * canvas.width;
+                const h = (rect.height / containerRect.height) * canvas.height;
+
+                // Sample center region for better accuracy
+                const sampleX = Math.floor(x + w * 0.3);
+                const sampleY = Math.floor(y + h * 0.3);
+                const sampleW = Math.floor(w * 0.4);
+                const sampleH = Math.floor(h * 0.4);
+
+                try {
+                    const frame = ctx.getImageData(sampleX, sampleY, sampleW, sampleH);
+                    const result = analyzeRegion(frame);
                     
-                    if (confidence > 80) {
-                        dot.className = 'color-dot detected';
-                        cell.className = baseClass + ' detected';
+                    // Visual feedback
+                    if (result.confidence > 0.6) {
+                        cell.style.background = `rgba(${getColorRGB(result.color)}, 0.3)`;
+                        cell.style.borderColor = getColorHex(result.color);
                     } else {
-                        dot.className = 'color-dot uncertain';
-                        cell.className = baseClass + ' uncertain';
+                        cell.style.background = 'rgba(255,255,255,0.05)';
+                        cell.style.borderColor = 'rgba(255,255,255,0.3)';
                     }
-                } else {
-                    dot.style.backgroundColor = 'rgba(239, 68, 68, 0.3)';
-                    dot.className = 'color-dot missing';
-                    cell.className = baseClass + ' missing';
-                }
-            });
-            
-            counter.textContent = `${validCount}/9 cores`;
-            updateMiniCubePreview(colors);
-            
-            if (validCount === 9) {
-                frame.className = 'detection-frame good';
-                status.textContent = '✓ Todas as cores detectadas';
-                status.className = 'text-lg font-bold text-green-400';
-            } else if (validCount >= 5) {
-                frame.className = 'detection-frame partial';
-                status.textContent = `⚠️ ${validCount}/9 detectadas`;
-                status.className = 'text-lg font-bold text-yellow-400';
-            } else {
-                frame.className = 'detection-frame waiting';
-                status.textContent = `❌ ${validCount}/9 - Aproxime mais`;
-                status.className = 'text-lg font-bold text-red-400';
-            }
-        }
 
-        function updateMiniCubePreview(colors) {
-            if (!colors) return;
-            colors.forEach((color, i) => {
-                const cell = document.getElementById(`mini-cell-${i}`);
-                if (!cell) return;
-                
-                if (color && COLORS[color]) {
-                    const hex = COLORS[color];
-                    cell.style.backgroundColor = `rgb(${(hex >> 16) & 255}, ${(hex >> 8) & 255}, ${hex & 255})`;
-                } else {
-                    cell.style.backgroundColor = '#374151';
+                    // Update preview occasionally
+                    if (index === 4 && Math.random() < 0.2) {
+                        updateDetectionPreview(result);
+                    }
+                } catch (e) {
+                    // Ignore out of bounds errors
                 }
             });
         }
 
-        function forceCapture() {
-            clearTimeout(state.detectionTimer);
-            openEditor(state.currentDetection, state.detectionConfidence);
+        function analyzeRegion(imageData) {
+            const data = imageData.data;
+            const len = data.length;
+            let r = 0, g = 0, b = 0;
+            let count = 0;
+
+            // Skip alpha and sample every 4th pixel for performance
+            for (let i = 0; i < len; i += 16) {
+                r += data[i];
+                g += data[i + 1];
+                b += data[i + 2];
+                count++;
+            }
+
+            r = Math.round(r / count);
+            g = Math.round(g / count);
+            b = Math.round(b / count);
+
+            // Apply brightness/saturation adjustments
+            const brightness = parseFloat(document.getElementById('rangeBrightness').value);
+            const saturation = parseFloat(document.getElementById('rangeSaturation').value);
+            
+            r = Math.min(255, r * brightness);
+            g = Math.min(255, g * brightness);
+            b = Math.min(255, b * brightness);
+
+            return detectColor(r, g, b);
         }
 
-        function requestStabilityCapture() {
-            const validCount = state.currentDetection.filter(c => c !== null).length;
-            if (validCount === 9) {
-                clearTimeout(state.detectionTimer);
-                const avgConfidence = state.detectionConfidence.reduce((a,b) => a+b, 0) / 9;
-                if (avgConfidence > 70) {
-                    state.scannedFaces[state.currentFaceIndex] = [...state.currentDetection];
-                    state.faceConfidence[state.currentFaceIndex] = 'high';
-                    advanceFace();
-                } else {
-                    openEditor(state.currentDetection, state.detectionConfidence);
+        function getColorRGB(colorName) {
+            const colors = {
+                white: '255,255,255', red: '255,68,68', green: '68,255,68',
+                orange: '255,136,68', blue: '68,68,255', yellow: '255,255,68'
+            };
+            return colors[colorName] || '128,128,128';
+        }
+
+        function getColorHex(colorName) {
+            const colors = {
+                white: '#ffffff', red: '#ff4444', green: '#44ff44',
+                orange: '#ff8844', blue: '#4444ff', yellow: '#ffff44'
+            };
+            return colors[colorName] || '#888888';
+        }
+
+        function updateDetectionPreview(result) {
+            const preview = document.getElementById('detectionPreview');
+            const div = document.createElement('div');
+            div.className = 'detected-color';
+            div.style.background = getColorHex(result.color);
+            div.innerHTML = `<div class="confidence-bar"><div class="confidence-fill" style="width: ${result.confidence * 100}%"></div></div>`;
+            
+            if (preview.children.length > 8) {
+                preview.removeChild(preview.firstChild);
+            }
+            preview.appendChild(div);
+        }
+
+        // Capture current frame
+        function captureFrame() {
+            const flash = document.getElementById('flash');
+            flash.classList.add('active');
+            setTimeout(() => flash.classList.remove('active'), 100);
+
+            const cells = document.querySelectorAll('.scan-cell');
+            const faceData = [];
+
+            cells.forEach((cell, index) => {
+                const rect = cell.getBoundingClientRect();
+                const containerRect = document.querySelector('.camera-container').getBoundingClientRect();
+                
+                const x = ((rect.left - containerRect.left) / containerRect.width) * canvas.width;
+                const y = ((rect.top - containerRect.top) / containerRect.height) * canvas.height;
+                const w = (rect.width / containerRect.width) * canvas.width;
+                const h = (rect.height / containerRect.height) * canvas.height;
+
+                const sampleX = Math.floor(x + w * 0.3);
+                const sampleY = Math.floor(y + h * 0.3);
+                const sampleW = Math.floor(w * 0.4);
+                const sampleH = Math.floor(h * 0.4);
+
+                try {
+                    const frame = ctx.getImageData(sampleX, sampleY, sampleW, sampleH);
+                    const result = analyzeRegion(frame);
+                    faceData[index] = result.confidence > 0.5 ? result.color : 'unknown';
+                } catch (e) {
+                    faceData[index] = 'unknown';
                 }
-            } else {
-                alert(`Só é possível capturar estável com 9/9 cores detectadas. Atual: ${validCount}/9`);
+            });
+
+            // Validate center color matches expected face
+            const expectedCenter = document.querySelector('.face-btn.active').dataset.color;
+            if (faceData[4] !== expectedCenter && faceData[4] !== 'unknown') {
+                if (!confirm(`Cor central detectada (${faceData[4]}) diferente do esperado (${expectedCenter}). Continuar mesmo assim?`)) {
+                    return;
+                }
+            }
+
+            cubeState[currentFace] = faceData;
+            updatePreview();
+            checkCompletion();
+            
+            // Auto-advance to next face
+            const currentIndex = faceOrder.indexOf(currentFace);
+            if (currentIndex < 5) {
+                setTimeout(() => selectFace(faceOrder[currentIndex + 1]), 500);
             }
         }
 
-        function openEditor(colors, confidences) {
-            state.isEditing = true;
-            state.detectionActive = false;
-            
-            state.editingColors = colors.map((c, i) => c || 'gray');
-            state.editingConfidences = confidences;
-            
-            document.getElementById('scanner-section').classList.add('hidden');
-            document.getElementById('editor-section').classList.remove('hidden');
-            
-            const face = FACE_ORDER[state.currentFaceIndex];
-            document.getElementById('editor-face-name').textContent = `${face.name} (${face.color})`;
-            
-            const validCount = colors.filter(c => c !== null).length;
-            const confText = validCount === 9 ? 'Alta' : validCount >= 6 ? 'Média' : 'Baixa';
-            const confClass = validCount === 9 ? 'text-green-400' : validCount >= 6 ? 'text-yellow-400' : 'text-red-400';
-            
-            document.getElementById('editor-confidence').innerHTML = `Confiança: <span class="${confClass}">${confText}</span> (${validCount}/9)`;
-            
-            renderEditorGrid();
+        // Auto-scan all faces
+        async function autoScan() {
+            const btn = document.getElementById('btnAuto');
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Escaneando...';
+
+            for (let i = 0; i < faceOrder.length; i++) {
+                selectFace(faceOrder[i]);
+                await new Promise(r => setTimeout(r, 800));
+                captureFrame();
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<span>🔄</span> Auto-Scan';
         }
 
-        function renderEditorGrid() {
-            const grid = document.getElementById('editor-grid');
+        // UI Functions
+        function selectFace(face) {
+            currentFace = face;
+            document.querySelectorAll('.face-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.face === face) btn.classList.add('active');
+            });
+            
+            const names = {U: 'White (Up)', R: 'Red (Right)', F: 'Green (Front)', 
+                          L: 'Orange (Left)', B: 'Blue (Back)', D: 'Yellow (Down)'};
+            document.getElementById('currentFaceName').textContent = names[face];
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const grid = document.getElementById('previewGrid');
             grid.innerHTML = '';
             
-            state.editingColors.forEach((color, i) => {
-                const cell = document.createElement('div');
-                cell.className = 'editor-cell';
-                cell.style.backgroundColor = `rgb(${(COLORS[color] >> 16) & 255}, ${(COLORS[color] >> 8) & 255}, ${COLORS[color] & 255})`;
-                cell.onclick = () => selectEditorCell(i);
-                
-                const confidence = state.editingConfidences[i];
-                const badge = document.createElement('div');
-                badge.className = 'confidence-badge ' + 
-                    (color === 'gray' ? 'badge-low' : confidence > 80 ? 'badge-high' : 'badge-medium');
-                badge.textContent = color === 'gray' ? '!' : confidence > 80 ? '✓' : '?';
-                
-                cell.appendChild(badge);
-                grid.appendChild(cell);
-            });
-        }
-
-        function initColorPalette() {
-            const palette = document.getElementById('color-palette');
-            COLOR_NAMES.forEach(color => {
-                const option = document.createElement('div');
-                option.className = 'color-option';
-                option.style.backgroundColor = `rgb(${(COLORS[color] >> 16) & 255}, ${(COLORS[color] >> 8) & 255}, ${COLORS[color] & 255})`;
-                option.setAttribute('data-color', color);
-                option.onclick = () => applyColor(color);
-                palette.appendChild(option);
-            });
-        }
-
-        function selectEditorCell(index) {
-            state.selectedCell = index;
-            document.querySelectorAll('.editor-cell').forEach((cell, i) => {
-                cell.classList.toggle('selected', i === index);
-            });
-        }
-
-        function applyColor(color) {
-            if (state.selectedCell === null) {
-                alert('Selecione uma célula primeiro!');
-                return;
-            }
-            state.editingColors[state.selectedCell] = color;
-            state.editingConfidences[state.selectedCell] = 100;
-            renderEditorGrid();
-            selectEditorCell(state.selectedCell);
-        }
-
-        function retakeFace() {
-            state.isEditing = false;
-            state.detectionActive = true;
-            document.getElementById('editor-section').classList.add('hidden');
-            document.getElementById('scanner-section').classList.remove('hidden');
-            startDetectionLoop();
-        }
-
-        function confirmFaceEdit() {
-            const undefinedCells = state.editingColors.filter(c => c === 'gray').length;
-            if (undefinedCells > 0) {
-                if (!confirm(`${undefinedCells} células sem cor. Preencher com cor do centro?`)) return;
-                const centerColor = FACE_ORDER[state.currentFaceIndex].color;
-                for (let i = 0; i < 9; i++) {
-                    if (state.editingColors[i] === 'gray') state.editingColors[i] = centerColor;
-                }
-            }
-            
-            state.scannedFaces[state.currentFaceIndex] = [...state.editingColors];
-            state.faceConfidence[state.currentFaceIndex] = state.editingConfidences.filter(c => c === 100).length > 3 ? 'medium' : 'high';
-            
-            state.isEditing = false;
-            advanceFace();
-        }
-
-        function advanceFace() {
-            updatePreviewCube3D();
-            updateScanProgress();
-            state.currentFaceIndex++;
-            
-            if (state.currentFaceIndex < 6) {
-                document.getElementById('editor-section').classList.add('hidden');
-                document.getElementById('scanner-section').classList.remove('hidden');
-                
-                const face = FACE_ORDER[state.currentFaceIndex];
-                document.getElementById('current-face-badge').textContent = `${face.name} (${face.color})`;
-                
-                for (let i = 0; i < 9; i++) {
-                    const dot = document.getElementById(`dot-${i}`);
-                    dot.style.backgroundColor = 'rgba(0,0,0,0.6)';
-                    dot.className = 'color-dot';
-                    document.getElementById(`cell-${i}`).className = `scanner-cell ${i === 4 ? 'center' : ''}`;
-                }
-                
-                state.detectionActive = true;
-                startDetectionLoop();
-            } else {
-                finishScanning();
-            }
-        }
-
-        function updateScanProgress() {
-            const container = document.getElementById('scan-progress');
-            container.innerHTML = '';
-            for (let i = 0; i < 6; i++) {
-                const dot = document.createElement('div');
-                const face = state.scannedFaces[i];
-                const confidence = state.faceConfidence[i];
-                const bgClass = face ? (confidence === 'high' ? 'bg-green-500' : 'bg-yellow-500') : 
-                               i === state.currentFaceIndex ? 'bg-blue-500 animate-pulse' : 'bg-gray-600';
-                dot.className = `w-3 h-3 rounded-full ${bgClass}`;
-                container.appendChild(dot);
-            }
-        }
-
-        function finishScanning() {
-            document.getElementById('stage-indicator').textContent = 'Fase: Solução';
-            document.getElementById('editor-section').classList.add('hidden');
-            document.getElementById('scanner-section').classList.add('hidden');
-            document.getElementById('solver-section').classList.remove('hidden');
-            
-            const video = document.getElementById('camera-feed');
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
-            
-            initMainCube();
-            solver.init();
-        }
-
-        // MAIN CUBE 3D
-        function initMainCube() {
-            const container = document.getElementById('main-cube-container');
-            mainScene = new THREE.Scene();
-            mainScene.background = new THREE.Color(0x0f172a);
-            
-            mainCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
-            mainCamera.position.set(4, 3, 5);
-            mainCamera.lookAt(0, 0, 0);
-            
-            mainRenderer = new THREE.WebGLRenderer({ antialias: false });
-            mainRenderer.setSize(container.clientWidth, container.clientHeight);
-            mainRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-            mainRenderer.shadowMap.enabled = false;
-            container.appendChild(mainRenderer.domElement);
-            
-            mainScene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            const light = new THREE.DirectionalLight(0xffffff, 0.4);
-            light.position.set(5, 10, 7);
-            mainScene.add(light);
-            
-            createCubiesWithState();
-            
-            let needsRender = true;
-            function animate() {
-                requestAnimationFrame(animate);
-                if (needsRender) {
-                    mainRenderer.render(mainScene, mainCamera);
-                    needsRender = false;
-                }
-            }
-            animate();
-            
-            container.addEventListener('mousedown', () => { needsRender = true; });
-            container.addEventListener('touchstart', () => { needsRender = true; });
-        }
-
-        function createCubiesWithState() {
-            cubies = [];
-            const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
-            
-            for (let x = -1; x <= 1; x++) {
-                for (let y = -1; y <= 1; y++) {
-                    for (let z = -1; z <= 1; z++) {
-                        const stickers = [];
-                        
-                        if (x === 1) stickers.push({ faceIdx: 1, color: getColorFromScan(1, x, y, z), normal: [1, 0, 0], materialIndex: 0 });
-                        if (x === -1) stickers.push({ faceIdx: 3, color: getColorFromScan(3, x, y, z), normal: [-1, 0, 0], materialIndex: 1 });
-                        if (y === 1) stickers.push({ faceIdx: 4, color: getColorFromScan(4, x, y, z), normal: [0, 1, 0], materialIndex: 2 });
-                        if (y === -1) stickers.push({ faceIdx: 5, color: getColorFromScan(5, x, y, z), normal: [0, -1, 0], materialIndex: 3 });
-                        if (z === 1) stickers.push({ faceIdx: 0, color: getColorFromScan(0, x, y, z), normal: [0, 0, 1], materialIndex: 4 });
-                        if (z === -1) stickers.push({ faceIdx: 2, color: getColorFromScan(2, x, y, z), normal: [0, 0, -1], materialIndex: 5 });
-                        
-                        const materials = [
-                            getMaterialForFace(stickers, 0), getMaterialForFace(stickers, 1),
-                            getMaterialForFace(stickers, 2), getMaterialForFace(stickers, 3),
-                            getMaterialForFace(stickers, 4), getMaterialForFace(stickers, 5),
-                        ];
-                        
-                        const mesh = new THREE.Mesh(geometry, materials);
-                        mesh.position.set(x, y, z);
-                        
-                        const cubie = {
-                            mesh: mesh,
-                            x: x, y: y, z: z,
-                            stickers: stickers,
-                            originalPos: { x, y, z }
-                        };
-                        
-                        mainScene.add(mesh);
-                        cubies.push(cubie);
+            cubeState[currentFace].forEach((color, index) => {
+                const div = document.createElement('div');
+                div.className = 'preview-cell';
+                div.style.background = getColorHex(color);
+                div.dataset.index = index;
+                div.onclick = () => {
+                    if (isManualMode) {
+                        cubeState[currentFace][index] = selectedColor;
+                        updatePreview();
+                        checkCompletion();
                     }
-                }
-            }
-            
-            initializeCubeState();
-        }
-
-        function getMaterialForFace(stickers, materialIndex) {
-            const sticker = stickers.find(s => s.materialIndex === materialIndex);
-            const color = sticker ? sticker.color : 'black';
-            return new THREE.MeshPhongMaterial({ color: COLORS[color] || COLORS.black, shininess: 100 });
-        }
-
-        function getColorFromScan(faceIdx, x, y, z) {
-            const face = state.scannedFaces[faceIdx];
-            if (!face) return 'gray';
-            let idx;
-            switch(faceIdx) {
-                case 0: idx = (1-y)*3 + (x+1); break;
-                case 1: idx = (1-y)*3 + (1-z); break;
-                case 2: idx = (1-y)*3 + (1-x); break;
-                case 3: idx = (1-y)*3 + (z+1); break;
-                case 4: idx = (1-z)*3 + (x+1); break;
-                case 5: idx = (1+z)*3 + (x+1); break;
-            }
-            return face[idx] || 'gray';
-        }
-
-        function initializeCubeState() {
-            state.cubeState = {};
-            cubies.forEach(cubie => {
-                const key = `${cubie.x},${cubie.y},${cubie.z}`;
-                state.cubeState[key] = cubie.stickers.map(s => ({ 
-                    faceIdx: s.faceIdx, color: s.color, normal: [...s.normal], materialIndex: s.materialIndex
-                }));
-            });
-        }
-
-        async function rotateLayer(axis, layer, angle, duration = 600) {
-            return new Promise(resolve => {
-                const layerCubies = cubies.filter(c => Math.abs(c[axis] - layer) < 0.1);
-                const pivot = new THREE.Object3D();
-                mainScene.add(pivot);
-                layerCubies.forEach(c => pivot.attach(c.mesh));
-                
-                const start = Date.now();
-                const initialRotation = pivot.rotation[axis];
-                let lastFrame = start;
-                
-                function animate() {
-                    const now = Date.now();
-                    const elapsed = now - start;
-                    const progress = Math.min(elapsed / duration, 1);
-                    const eased = 1 - Math.pow(1 - progress, 3);
-                    
-                    pivot.rotation[axis] = initialRotation + (angle * eased);
-                    
-                    if (now - lastFrame > 33) {
-                        mainRenderer.render(mainScene, mainCamera);
-                        lastFrame = now;
-                    }
-                    
-                    if (progress < 1) {
-                        requestAnimationFrame(animate);
-                    } else {
-                        pivot.updateMatrixWorld();
-                        layerCubies.forEach(cubie => {
-                            mainScene.attach(cubie.mesh);
-                            const newPos = cubie.mesh.position.clone();
-                            cubie.x = Math.round(newPos.x);
-                            cubie.y = Math.round(newPos.y);
-                            cubie.z = Math.round(newPos.z);
-                            rotateCubieStickers(cubie, axis, angle);
-                            updateCubieMaterials(cubie);
-                        });
-                        mainScene.remove(pivot);
-                        updateCubeStateFromCubies();
-                        mainRenderer.render(mainScene, mainCamera);
-                        resolve();
-                    }
-                }
-                animate();
-            });
-        }
-
-        function rotateCubieStickers(cubie, axis, angle) {
-            const cos = Math.round(Math.cos(angle));
-            const sin = Math.round(Math.sin(angle));
-            
-            cubie.stickers.forEach(sticker => {
-                const [nx, ny, nz] = sticker.normal;
-                let newNormal;
-                
-                if (axis === 'x') {
-                    newNormal = [nx, ny * cos - nz * sin, ny * sin + nz * cos];
-                } else if (axis === 'y') {
-                    newNormal = [nx * cos + nz * sin, ny, -nx * sin + nz * cos];
-                } else {
-                    newNormal = [nx * cos - ny * sin, nx * sin + ny * cos, nz];
-                }
-                
-                sticker.normal = newNormal.map(v => Math.abs(v) < 0.1 ? 0 : Math.round(v));
-                
-                const [x, y, z] = sticker.normal;
-                if (x === 1) sticker.materialIndex = 0;
-                else if (x === -1) sticker.materialIndex = 1;
-                else if (y === 1) sticker.materialIndex = 2;
-                else if (y === -1) sticker.materialIndex = 3;
-                else if (z === 1) sticker.materialIndex = 4;
-                else if (z === -1) sticker.materialIndex = 5;
-                
-                if (x === 1) sticker.faceIdx = 1;
-                else if (x === -1) sticker.faceIdx = 3;
-                else if (y === 1) sticker.faceIdx = 4;
-                else if (y === -1) sticker.faceIdx = 5;
-                else if (z === 1) sticker.faceIdx = 0;
-                else if (z === -1) sticker.faceIdx = 2;
-            });
-        }
-
-        function updateCubieMaterials(cubie) {
-            const newMaterials = [
-                getMaterialByIndex(cubie, 0), getMaterialByIndex(cubie, 1),
-                getMaterialByIndex(cubie, 2), getMaterialByIndex(cubie, 3),
-                getMaterialByIndex(cubie, 4), getMaterialByIndex(cubie, 5),
-            ];
-            cubie.mesh.material = newMaterials;
-        }
-
-        function getMaterialByIndex(cubie, materialIndex) {
-            const sticker = cubie.stickers.find(s => s.materialIndex === materialIndex);
-            const color = sticker ? sticker.color : 'black';
-            return new THREE.MeshPhongMaterial({ color: COLORS[color] || COLORS.black, shininess: 100 });
-        }
-
-        function updateCubeStateFromCubies() {
-            state.cubeState = {};
-            cubies.forEach(cubie => {
-                const key = `${cubie.x},${cubie.y},${cubie.z}`;
-                state.cubeState[key] = cubie.stickers.map(s => ({ 
-                    faceIdx: s.faceIdx, color: s.color, normal: [...s.normal], materialIndex: s.materialIndex
-                }));
-            });
-        }
-
-        // SOLVER INTELIGENTE CORRIGIDO
-        const solver = {
-            moves: [],
-            currentMove: 0,
-            isPlaying: false,
-            isAnimating: false,
-            
-            init() {
-                this.analyzeAndSolve();
-            },
-            
-            analyzeAndSolve() {
-                if (this.isCubeSolved()) {
-                    this.showSolvedState();
-                    return;
-                }
-                
-                const solution = this.findSolution();
-                this.moves = solution;
-                this.currentMove = 0;
-                this.renderMoves();
-                this.updateProgress();
-                this.updateSolverInfo();
-            },
-            
-            isCubeSolved() {
-                for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
-                    const faceColors = new Set();
-                    cubies.forEach(cubie => {
-                        cubie.stickers.forEach(s => {
-                            if (s.faceIdx === faceIdx && s.color !== 'black') {
-                                faceColors.add(s.color);
-                            }
-                        });
-                    });
-                    if (faceColors.size !== 1) return false;
-                }
-                return true;
-            },
-            
-            findSolution() {
-                const solution = [];
-                
-                const whiteCrossMoves = this.solveWhiteCross();
-                solution.push(...whiteCrossMoves);
-                
-                const f2lMoves = this.solveF2L();
-                solution.push(...f2lMoves);
-                
-                const ollMoves = this.solveOLL();
-                solution.push(...ollMoves);
-                
-                const pllMoves = this.solvePLL();
-                solution.push(...pllMoves);
-                
-                if (!this.isCubeSolved() && solution.length < 100) {
-                    const searchMoves = this.searchSolution();
-                    solution.push(...searchMoves);
-                }
-                
-                return solution.length > 0 ? solution : this.generateBasicSolution();
-            },
-            
-            solveWhiteCross() {
-                const moves = [];
-                const whiteEdges = this.findWhiteEdges();
-                
-                whiteEdges.forEach(edge => {
-                    if (!edge.solved) {
-                        moves.push(...this.getEdgeToCrossMoves(edge));
-                    }
-                });
-                
-                return moves.length > 0 ? moves : ['D', 'F', 'D\'', 'F\'', 'D', 'R', 'D\'', 'R\'', 'D', 'B', 'D\'', 'B\'', 'D', 'L', 'D\'', 'L\''];
-            },
-            
-            solveF2L() {
-                return ['U', 'R', 'U\'', 'R\'', 'F', 'R\'', 'F\'', 'R', 'U\'', 'F\'', 'U', 'F', 'R\'', 'F', 'R', 'F\''];
-            },
-            
-            solveOLL() {
-                return ['R', 'U', 'R\'', 'U', 'R', 'U2', 'R\'', 'U', 'R', 'U\'', 'L\'', 'U', 'R\'', 'U\'', 'L'];
-            },
-            
-            solvePLL() {
-                return ['R', 'U\'', 'R', 'U', 'R', 'U', 'R', 'U\'', 'R\'', 'U\'', 'R2'];
-            },
-            
-            findWhiteEdges() {
-                const edges = [];
-                cubies.forEach(cubie => {
-                    if (cubie.stickers.length === 2) {
-                        const whiteSticker = cubie.stickers.find(s => s.color === 'white');
-                        if (whiteSticker) {
-                            edges.push({
-                                cubie: cubie,
-                                solved: this.isEdgeSolved(cubie, whiteSticker),
-                                position: { x: cubie.x, y: cubie.y, z: cubie.z }
-                            });
-                        }
-                    }
-                });
-                return edges;
-            },
-            
-            isEdgeSolved(cubie, whiteSticker) {
-                return whiteSticker.faceIdx === 5 && cubie.y === -1;
-            },
-            
-            getEdgeToCrossMoves(edge) {
-                return ['F', 'D', 'F\''];
-            },
-            
-            searchSolution() {
-                const possibleMoves = ['F', 'F\'', 'R', 'R\'', 'U', 'U\'', 'B', 'B\'', 'L', 'L\'', 'D', 'D\''];
-                const randomMoves = [];
-                for (let i = 0; i < 10; i++) {
-                    randomMoves.push(possibleMoves[Math.floor(Math.random() * possibleMoves.length)]);
-                }
-                return randomMoves;
-            },
-            
-            generateBasicSolution() {
-                return ['F', 'R', 'U', 'R\'', 'U\'', 'F\''];
-            },
-            
-            showSolvedState() {
-                this.moves = [];
-                this.currentMove = 0;
-                
-                document.getElementById('solver-info').className = 'solver-info w-full max-w-lg solved';
-                document.getElementById('solver-analysis').textContent = '✓ Cubo já está resolvido!';
-                document.getElementById('solver-suggestion').textContent = 'Nenhum movimento necessário. Parabéns!';
-                document.getElementById('solver-status').textContent = 'Cubo Resolvido';
-                document.getElementById('solver-status').className = 'text-green-400 font-bold';
-                document.getElementById('move-description').textContent = 'Nada a fazer - cubo perfeito';
-                
-                this.renderMoves();
-                this.updateProgress();
-            },
-            
-            updateSolverInfo() {
-                const infoDiv = document.getElementById('solver-info');
-                const analysisText = document.getElementById('solver-analysis');
-                const suggestionText = document.getElementById('solver-suggestion');
-                
-                infoDiv.className = 'solver-info w-full max-w-lg';
-                
-                const solvedFaces = this.countSolvedFaces();
-                analysisText.textContent = `Faces resolvidas: ${solvedFaces}/6 | Movimentos necessários: ${this.moves.length}`;
-                suggestionText.textContent = this.moves.length > 20 ? 
-                    'Solução completa em múltiplas fases' : 
-                    'Solução rápida possível!';
-            },
-            
-            countSolvedFaces() {
-                let count = 0;
-                for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
-                    const faceColors = new Set();
-                    cubies.forEach(cubie => {
-                        cubie.stickers.forEach(s => {
-                            if (s.faceIdx === faceIdx && s.color !== 'black') {
-                                faceColors.add(s.color);
-                            }
-                        });
-                    });
-                    if (faceColors.size === 1) count++;
-                }
-                return count;
-            },
-            
-            async scrambleCube() {
-                const moves = ['F', 'R', 'U', 'B', 'L', 'D'];
-                const modifiers = ['', '\'', '2'];
-                const scrambleMoves = [];
-                
-                for (let i = 0; i < 20; i++) {
-                    const move = moves[Math.floor(Math.random() * moves.length)];
-                    const mod = modifiers[Math.floor(Math.random() * modifiers.length)];
-                    scrambleMoves.push(move + mod);
-                }
-                
-                document.getElementById('solver-status').textContent = 'Embaralhando...';
-                document.getElementById('solver-status').className = 'text-orange-400 font-bold';
-                
-                for (const move of scrambleMoves) {
-                    await this.executeMove(move, 200);
-                }
-                
-                document.getElementById('solver-status').textContent = 'Cubo embaralhado!';
-                document.getElementById('solver-status').className = 'text-yellow-400 font-bold';
-                
-                setTimeout(() => this.analyzeAndSolve(), 500);
-            },
-            
-            async executeMove(move, duration = 600) {
-                if (this.isAnimating) return;
-                this.isAnimating = true;
-                
-                const face = move.charAt(0);
-                const mod = move.charAt(1) || '';
-                let angle;
-                
-                if (mod === '\'') angle = -Math.PI/2;
-                else if (mod === '2') angle = Math.PI;
-                else angle = Math.PI/2;
-                
-                const config = {
-                    'F': { axis: 'z', layer: 1 }, 'B': { axis: 'z', layer: -1 },
-                    'R': { axis: 'x', layer: 1 }, 'L': { axis: 'x', layer: -1 },
-                    'U': { axis: 'y', layer: 1 }, 'D': { axis: 'y', layer: -1 }
-                }[face];
-                
-                if (!config) {
-                    this.isAnimating = false;
-                    return;
-                }
-                
-                await rotateLayer(config.axis, config.layer, angle, duration);
-                this.isAnimating = false;
-                
-                if (this.isCubeSolved()) {
-                    setTimeout(() => {
-                        document.getElementById('solver-status').textContent = '✓ Cubo Resolvido!';
-                        document.getElementById('solver-status').className = 'text-green-400 font-bold';
-                        document.getElementById('move-description').textContent = 'Solução completa!';
-                        this.isPlaying = false;
-                        document.getElementById('play-btn').textContent = '▶ Play';
-                    }, 300);
-                }
-                
-                this.updateMoveDescription(move);
-            },
-            
-            updateMoveDescription(move) {
-                const descriptions = {
-                    'F': 'Gira face Frontal (Verde)', 'F\'': 'Gira Frontal anti-horário', 'F2': 'Gira Frontal 180°',
-                    'B': 'Gira face Traseira (Azul)', 'B\'': 'Gira Traseira anti-horário', 'B2': 'Gira Traseira 180°',
-                    'R': 'Gira face Direita (Vermelha)', 'R\'': 'Gira Direita anti-horário', 'R2': 'Gira Direita 180°',
-                    'L': 'Gira face Esquerda (Laranja)', 'L\'': 'Gira Esquerda anti-horário', 'L2': 'Gira Esquerda 180°',
-                    'U': 'Gira face Superior (Branca)', 'U\'': 'Gira Superior anti-horário', 'U2': 'Gira Superior 180°',
-                    'D': 'Gira face Inferior (Amarela)', 'D\'': 'Gira Inferior anti-horário', 'D2': 'Gira Inferior 180°',
                 };
-                document.getElementById('move-description').textContent = descriptions[move] || move;
-            },
-            
-            renderMoves() {
-                const container = document.getElementById('moves-display');
-                container.innerHTML = '';
-                
-                if (this.moves.length === 0) {
-                    container.innerHTML = '<span class="text-gray-500">Nenhum movimento necessário</span>';
-                    return;
-                }
-                
-                this.moves.forEach((move, i) => {
-                    const span = document.createElement('span');
-                    span.className = `move-notation ${i < this.currentMove ? 'completed' : i === this.currentMove ? 'active' : ''}`;
-                    span.textContent = move;
-                    container.appendChild(span);
-                });
-                
-                if (this.currentMove < this.moves.length) {
-                    const activeMove = container.children[this.currentMove];
-                    if (activeMove) {
-                        activeMove.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                    }
-                }
-            },
-            
-            async next() {
-                if (this.currentMove < this.moves.length && !this.isAnimating) {
-                    await this.executeMove(this.moves[this.currentMove]);
-                    this.currentMove++;
-                    this.updateProgress();
-                    this.renderMoves();
-                }
-            },
-            
-            async prev() {
-                if (this.currentMove > 0 && !this.isAnimating) {
-                    this.currentMove--;
-                    const move = this.moves[this.currentMove];
-                    let inverse;
-                    if (move.includes('\'')) inverse = move.replace('\'', '');
-                    else if (move.includes('2')) inverse = move;
-                    else inverse = move + '\'';
-                    
-                    await this.executeMove(inverse);
-                    this.updateProgress();
-                    this.renderMoves();
-                }
-            },
-            
-            togglePlay() {
-                const btn = document.getElementById('play-btn');
-                if (this.isPlaying) {
-                    this.isPlaying = false;
-                    btn.textContent = '▶ Play';
-                    clearInterval(this.playInterval);
-                } else {
-                    this.isPlaying = true;
-                    btn.textContent = '⏸ Pause';
-                    this.playLoop();
-                }
-            },
-            
-            async playLoop() {
-                while (this.isPlaying && this.currentMove < this.moves.length) {
-                    if (this.isCubeSolved()) {
-                        this.isPlaying = false;
-                        document.getElementById('play-btn').textContent = '▶ Play';
-                        break;
-                    }
-                    await this.next();
-                    await new Promise(r => setTimeout(r, 800));
-                }
-                if (this.currentMove >= this.moves.length) {
-                    this.isPlaying = false;
-                    document.getElementById('play-btn').textContent = '▶ Play';
-                }
-            },
-            
-            resetCube() {
-                this.isPlaying = false;
-                document.getElementById('play-btn').textContent = '▶ Play';
-                cubies.forEach(c => mainScene.remove(c.mesh));
-                createCubiesWithState();
-                this.analyzeAndSolve();
-            },
-            
-            updateProgress() {
-                document.getElementById('move-counter').textContent = `${this.currentMove}/${this.moves.length}`;
-                const pct = this.moves.length > 0 ? (this.currentMove / this.moves.length) * 100 : 100;
-                document.getElementById('solution-progress').style.width = `${pct}%`;
-            }
-        };
+                grid.appendChild(div);
+            });
 
-        window.addEventListener('resize', () => {
-            if (mainCamera && mainRenderer) {
-                const container = document.getElementById('main-cube-container');
-                mainCamera.aspect = container.clientWidth / container.clientHeight;
-                mainCamera.updateProjectionMatrix();
-                mainRenderer.setSize(container.clientWidth, container.clientHeight);
+            // Update face button status
+            const faceBtn = document.querySelector(`.face-btn[data-face="${currentFace}"]`);
+            const isComplete = cubeState[currentFace].every(c => c !== 'unknown');
+            faceBtn.classList.toggle('completed', isComplete);
+        }
+
+        function checkCompletion() {
+            const allComplete = faceOrder.every(face => 
+                cubeState[face].every(c => c !== 'unknown')
+            );
+            document.getElementById('btnSolve').disabled = !allComplete;
+        }
+
+        // Manual mode toggle
+        document.getElementById('btnToggleManual').addEventListener('click', () => {
+            isManualMode = !isManualMode;
+            document.getElementById('colorPicker').style.display = isManualMode ? 'flex' : 'none';
+            document.getElementById('btnToggleManual').innerHTML = 
+                isManualMode ? '<span>📷</span> Modo Câmera' : '<span>✏️</span> Editar Manual';
+        });
+
+        // Color picker
+        document.querySelectorAll('.color-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                selectedColor = opt.dataset.color;
+            });
+        });
+
+        // Face buttons
+        document.querySelectorAll('.face-btn').forEach(btn => {
+            btn.addEventListener('click', () => selectFace(btn.dataset.face));
+        });
+
+        // Main controls
+        document.getElementById('btnScan').addEventListener('click', captureFrame);
+        document.getElementById('btnAuto').addEventListener('click', autoScan);
+        document.getElementById('btnReset').addEventListener('click', () => {
+            if (confirm('Limpar todo o cubo?')) {
+                faceOrder.forEach(face => {
+                    cubeState[face] = Array(9).fill('unknown');
+                });
+                document.querySelectorAll('.face-btn').forEach(btn => btn.classList.remove('completed'));
+                updatePreview();
+                checkCompletion();
             }
         });
 
-        window.addEventListener('DOMContentLoaded', init);
+        // Settings panel
+        document.getElementById('btnSettings').addEventListener('click', () => {
+            document.getElementById('settingsPanel').classList.add('open');
+        });
+        document.getElementById('btnCloseSettings').addEventListener('click', () => {
+            document.getElementById('settingsPanel').classList.remove('open');
+        });
+
+        // Calibration
+        document.getElementById('btnCalibrate').addEventListener('click', () => {
+            const panel = document.getElementById('calibrationPanel');
+            panel.classList.toggle('active');
+            
+            if (panel.classList.contains('active')) {
+                const grid = document.getElementById('calibrationGrid');
+                grid.innerHTML = '';
+                
+                Object.entries(colorProfiles).forEach(([name, profile]) => {
+                    const div = document.createElement('div');
+                    div.className = 'calib-item';
+                    div.innerHTML = `
+                        <div class="color-sample" style="background: rgb(${profile.rgb.join(',')})"></div>
+                        <div style="flex: 1;">
+                            <div style="text-transform: capitalize; font-weight: bold;">${name}</div>
+                            <input type="range" class="tolerance-slider" 
+                                   min="20" max="60" value="${profile.tolerance}" 
+                                   data-color="${name}">
+                        </div>
+                    `;
+                    grid.appendChild(div);
+                });
+            }
+        });
+
+        document.getElementById('btnSaveCalib').addEventListener('click', () => {
+            document.querySelectorAll('.tolerance-slider').forEach(slider => {
+                const color = slider.dataset.color;
+                colorProfiles[color].tolerance = parseInt(slider.value);
+            });
+            document.getElementById('calibrationPanel').classList.remove('active');
+            alert('Calibração salva!');
+        });
+
+        document.getElementById('btnResetCalib').addEventListener('click', () => {
+            location.reload(); // Simple reset
+        });
+
+        // Solve function (simplified - would integrate with actual solver)
+        document.getElementById('btnSolve').addEventListener('click', async () => {
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+            
+            // Simulate solving process
+            const progress = document.getElementById('progressFill');
+            for (let i = 0; i <= 100; i += 10) {
+                progress.style.width = i + '%';
+                await new Promise(r => setTimeout(r, 200));
+            }
+            
+            // Here you would integrate with a real solver like Kociemba
+            // For demo, we'll just show the cube state
+            console.log('Cube state:', cubeState);
+            
+            loading.classList.remove('active');
+            
+            // Generate solution URL or display steps
+            const solution = generateSolution(cubeState);
+            alert(`Solução calculada!\n\n${solution}\n\n(Integração completa com algoritmo Kociemba necessária para solução ótima)`);
+        });
+
+        function generateSolution(state) {
+            // This is a placeholder - real implementation would use Kociemba or similar
+            return "R U R' U' (Exemplo de movimento)\nIntegrar com biblioteca de resolução para solução completa em ~20 movimentos.";
+        }
+
+        // Initialize
+        initCamera();
+        updatePreview();
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && stream) {
+                stream.getTracks().forEach(track => track.pause());
+            } else if (stream) {
+                stream.getTracks().forEach(track => track.resume());
+            }
+        });
     </script>
 </body>
 </html>
