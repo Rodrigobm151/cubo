@@ -3,1208 +3,855 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Cube Scanner Pro - Solver 3x3</title>
+    <title>Cubo Mágico - Solver Kociemba</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Kociemba Solver -->
+    <script src="https://cdn.jsdelivr.net/npm/cube-solver@2.4.1/dist/bundle.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
-            min-height: 100vh;
-            overflow-x: hidden;
-            touch-action: manipulation;
-        }
-
-        .container {
-            max-width: 100%;
-            padding: 10px;
-            padding-bottom: 100px;
-        }
-
-        header {
-            text-align: center;
-            padding: 15px;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-
-        h1 {
-            font-size: 1.4rem;
-            background: linear-gradient(45deg, #00f2ff, #ff00e4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 5px;
-        }
-
-        .subtitle {
-            font-size: 0.8rem;
-            opacity: 0.8;
-            color: #aaa;
-        }
-
-        /* Scanner Section */
-        .scanner-section {
-            background: rgba(255,255,255,0.05);
-            border-radius: 20px;
-            padding: 15px;
-            margin: 15px 0;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            margin: 0 auto;
-            border-radius: 15px;
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
             overflow: hidden;
-            background: #000;
-            aspect-ratio: 1;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: #111827;
         }
-
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1); /* Mirror effect */
-        }
-
-        #canvas {
-            display: none;
-        }
-
-        .overlay-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .scan-grid {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 70%;
-            height: 70%;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 2px;
-            border: 3px solid rgba(255,255,255,0.8);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 0 20px rgba(0,242,255,0.3);
-        }
-
-        .scan-cell {
-            border: 1px solid rgba(255,255,255,0.3);
-            background: rgba(255,255,255,0.05);
+        
+        .cube-container {
+            width: 100vw;
+            height: 55vh;
             position: relative;
         }
-
-        .scan-cell.active {
-            background: rgba(0,242,255,0.2);
-            border-color: #00f2ff;
+        
+        .color-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            border: 3px solid transparent;
         }
-
-        .scan-point {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: rgba(255,255,255,0.9);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        
+        .color-btn:active {
+            transform: scale(0.9);
         }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
+        
+        .color-btn.selected {
+            transform: scale(1.15);
+            border-color: white;
+            box-shadow: 0 0 0 4px rgba(255,255,255,0.3), 0 8px 25px rgba(0,0,0,0.5);
         }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 25px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(45deg, #00f2ff, #0099ff);
-            color: #000;
-            box-shadow: 0 4px 15px rgba(0,242,255,0.4);
-        }
-
-        .btn-secondary {
-            background: rgba(255,255,255,0.1);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .btn-success {
-            background: linear-gradient(45deg, #00ff88, #00cc66);
-            color: #000;
-            box-shadow: 0 4px 15px rgba(0,255,136,0.4);
-        }
-
-        .btn:active {
-            transform: scale(0.95);
-        }
-
-        /* Face Selector */
-        .face-selector {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-
+        
         .face-btn {
-            width: 45px;
-            height: 45px;
-            border: 3px solid transparent;
-            border-radius: 10px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 0.8rem;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(75, 85, 99, 0.5);
+            transition: all 0.3s ease;
+            font-weight: 800;
+            letter-spacing: 0.05em;
         }
-
-        .face-btn.white { background: #f0f0f0; color: #333; }
-        .face-btn.red { background: #ff4444; color: #fff; }
-        .face-btn.green { background: #44ff44; color: #000; }
-        .face-btn.orange { background: #ff8844; color: #000; }
-        .face-btn.blue { background: #4444ff; color: #fff; }
-        .face-btn.yellow { background: #ffff44; color: #000; }
-
-        .face-btn.completed::after {
-            content: '✓';
-            position: absolute;
-            top: 2px;
-            right: 2px;
-            font-size: 0.7rem;
-            background: rgba(0,0,0,0.7);
-            color: #0f0;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
+        
         .face-btn.active {
-            border-color: #00f2ff;
-            transform: scale(1.1);
-            box-shadow: 0 0 20px rgba(0,242,255,0.5);
+            background: rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.8);
+            color: #60A5FA;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
         }
-
-        /* Cube Preview */
-        .cube-preview {
+        
+        .move-text {
+            font-variant-numeric: tabular-nums;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
+            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.5); }
+        }
+        
+        .solving {
+            animation: pulse-glow 2s infinite;
+        }
+        
+        .moves-list::-webkit-scrollbar {
+            height: 6px;
+        }
+        .moves-list::-webkit-scrollbar-track {
             background: rgba(255,255,255,0.05);
-            border-radius: 20px;
-            padding: 20px;
-            margin: 15px 0;
-            text-align: center;
         }
-
-        .preview-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 4px;
-            width: 150px;
-            margin: 0 auto;
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
+        .moves-list::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
         }
-
-        .preview-cell {
-            aspect-ratio: 1;
-            border-radius: 4px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s;
+        
+        .sticker {
             cursor: pointer;
+            transition: filter 0.2s;
         }
-
-        .preview-cell:hover {
-            transform: scale(1.1);
-            z-index: 10;
-            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+        .sticker:hover {
+            filter: brightness(1.2);
         }
-
-        /* Color Calibration */
-        .calibration-panel {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 15px;
-            margin: 15px 0;
-            display: none;
-        }
-
-        .calibration-panel.active {
-            display: block;
-        }
-
-        .calibration-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .calib-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 10px;
-        }
-
-        .color-sample {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.3);
-        }
-
-        .tolerance-slider {
-            width: 100%;
-            margin-top: 5px;
-        }
-
-        /* Manual Input Fallback */
-        .manual-input {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            max-width: 250px;
-            margin: 15px auto;
-        }
-
-        .color-picker {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-
-        .color-option {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 3px solid transparent;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-        }
-
-        .color-option.selected {
-            border-color: #fff;
-            transform: scale(1.2);
-            box-shadow: 0 0 15px currentColor;
-        }
-
-        /* Settings Panel */
-        .settings-panel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(20,20,30,0.98);
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 20px 20px 0 0;
-            transform: translateY(100%);
-            transition: transform 0.3s;
-            z-index: 200;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-
-        .settings-panel.open {
-            transform: translateY(0);
-        }
-
-        .settings-toggle {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #ff00e4, #ff0066);
-            border: none;
-            color: #fff;
-            font-size: 1.5rem;
-            cursor: pointer;
-            z-index: 201;
-            box-shadow: 0 4px 15px rgba(255,0,228,0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* Tips */
-        .tips {
-            background: rgba(0,242,255,0.1);
-            border-left: 4px solid #00f2ff;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 0 10px 10px 0;
-            font-size: 0.9rem;
-        }
-
-        .tips h3 {
-            margin-bottom: 8px;
-            color: #00f2ff;
-        }
-
-        .tips ul {
-            margin-left: 20px;
-            opacity: 0.9;
-        }
-
-        .tips li {
-            margin: 5px 0;
-        }
-
-        /* Loading */
-        .loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+        
+        .loading-overlay {
             background: rgba(0,0,0,0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            z-index: 1000;
+            backdrop-filter: blur(10px);
         }
-
-        .loading.active {
-            display: flex;
-        }
-
-        .spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(255,255,255,0.1);
-            border-top-color: #00f2ff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
+        
         .progress-bar {
-            width: 200px;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
-            margin-top: 20px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00f2ff, #ff00e4);
-            width: 0%;
-            transition: width 0.3s;
-        }
-
-        /* Detection Preview */
-        .detection-preview {
-            display: flex;
-            gap: 5px;
-            justify-content: center;
-            margin-top: 10px;
-            flex-wrap: wrap;
-        }
-
-        .detected-color {
-            width: 30px;
-            height: 30px;
-            border-radius: 5px;
-            border: 2px solid rgba(255,255,255,0.3);
-            position: relative;
-            animation: popIn 0.3s ease;
-        }
-
-        @keyframes popIn {
-            from { transform: scale(0); }
-            to { transform: scale(1); }
-        }
-
-        .confidence-bar {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: rgba(0,0,0,0.5);
-        }
-
-        .confidence-fill {
-            height: 100%;
-            background: #0f0;
-        }
-
-        /* Responsive */
-        @media (max-width: 380px) {
-            .face-btn {
-                width: 40px;
-                height: 40px;
-                font-size: 0.7rem;
-            }
-            
-            .btn {
-                padding: 10px 18px;
-                font-size: 0.8rem;
-            }
-        }
-
-        /* Flash effect */
-        .flash {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: white;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.1s;
-        }
-
-        .flash.active {
-            opacity: 0.8;
+            background: linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🎲 Cube Scanner Pro</h1>
-            <div class="subtitle">Escaneamento Inteligente 3x3</div>
-        </header>
+<body class="bg-gray-900 text-white h-screen flex flex-col">
 
-        <div class="tips">
-            <h3>💡 Dicas para Escaneamento Perfeito</h3>
-            <ul>
-                <li>Use luz natural ou iluminação uniforme</li>
-                <li>Evite reflexos e sombras no cubo</li>
-                <li>Mantenha o cubo centralizado na grade</li>
-                <li>Escaneie uma face por vez, começando pelo centro</li>
-            </ul>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay fixed inset-0 z-50 flex flex-col items-center justify-center">
+        <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 class="text-xl font-bold mb-2">Inicializando Solver Kociemba</h2>
+        <p class="text-gray-400 text-sm">Gerando tabelas de pruning (pode levar 2-5 segundos)...</p>
+        <div class="w-64 h-2 bg-gray-700 rounded-full mt-4 overflow-hidden">
+            <div id="progress-bar" class="progress-bar h-full w-0 transition-all duration-300"></div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="px-4 pt-3 pb-2 flex justify-between items-center bg-gray-800/80 backdrop-blur-md border-b border-gray-700">
+        <div>
+            <h1 class="text-lg font-bold tracking-tight text-white">Cubo Kociemba</h1>
+            <p class="text-xs text-gray-400 mt-0.5">Two-Phase Algorithm</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="resetCube()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-bold transition-colors border border-gray-600">
+                Limpar
+            </button>
+            <button onclick="randomizeCube()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs font-bold transition-colors">
+                Aleatório
+            </button>
+        </div>
+    </div>
+
+    <!-- 3D Cube View -->
+    <div class="cube-container relative" id="canvas-container">
+        <div class="absolute top-4 left-4 bg-black/50 backdrop-blur px-3 py-1.5 rounded-lg text-xs font-mono text-gray-300 border border-gray-700">
+            <span id="status-text">Pronto para colorir</span>
+        </div>
+    </div>
+
+    <!-- Face Selector -->
+    <div class="px-3 py-2 bg-gray-800/50 backdrop-blur-sm">
+        <div class="flex justify-center gap-1.5 mb-2 flex-wrap">
+            <button onclick="selectFace('U')" id="btn-U" class="face-btn px-3 py-2 rounded-xl text-xs">UP</button>
+            <button onclick="selectFace('D')" id="btn-D" class="face-btn px-3 py-2 rounded-xl text-xs">DOWN</button>
+            <button onclick="selectFace('F')" id="btn-F" class="face-btn px-3 py-2 rounded-xl text-xs active">FRONT</button>
+            <button onclick="selectFace('B')" id="btn-B" class="face-btn px-3 py-2 rounded-xl text-xs">BACK</button>
+            <button onclick="selectFace('L')" id="btn-L" class="face-btn px-3 py-2 rounded-xl text-xs">LEFT</button>
+            <button onclick="selectFace('R')" id="btn-R" class="face-btn px-3 py-2 rounded-xl text-xs">RIGHT</button>
+        </div>
+        
+        <p class="text-center text-xs text-gray-400 font-medium" id="instruction-text">
+            Toque nos quadrados para colorir a face FRONT
+        </p>
+    </div>
+
+    <!-- Color Palette -->
+    <div class="flex-1 px-3 py-3 bg-gray-800/80 backdrop-blur-md flex flex-col">
+        <div class="flex justify-center gap-2 mb-3 flex-wrap">
+            <button onclick="selectColor('white')" id="color-white" class="color-btn w-10 h-10 rounded-xl bg-gray-100" title="Branco"></button>
+            <button onclick="selectColor('yellow')" id="color-yellow" class="color-btn w-10 h-10 rounded-xl bg-yellow-400" title="Amarelo"></button>
+            <button onclick="selectColor('red')" id="color-red" class="color-btn w-10 h-10 rounded-xl bg-red-500" title="Vermelho"></button>
+            <button onclick="selectColor('orange')" id="color-orange" class="color-btn w-10 h-10 rounded-xl bg-orange-500" title="Laranja"></button>
+            <button onclick="selectColor('blue')" id="color-blue" class="color-btn w-10 h-10 rounded-xl bg-blue-500" title="Azul"></button>
+            <button onclick="selectColor('green')" id="color-green" class="color-btn w-10 h-10 rounded-xl bg-green-500" title="Verde"></button>
         </div>
 
-        <div class="scanner-section">
-            <div class="face-selector">
-                <div class="face-btn white active" data-face="U" data-color="white">UP</div>
-                <div class="face-btn red" data-face="R" data-color="red">RIGHT</div>
-                <div class="face-btn green" data-face="F" data-color="green">FRONT</div>
-                <div class="face-btn orange" data-face="L" data-color="orange">LEFT</div>
-                <div class="face-btn blue" data-face="B" data-color="blue">BACK</div>
-                <div class="face-btn yellow" data-face="D" data-color="yellow">DOWN</div>
-            </div>
+        <!-- Action Buttons -->
+        <div class="flex gap-2 mb-3">
+            <button onclick="validateAndSolve()" id="solve-btn" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 py-3 rounded-xl font-bold text-sm shadow-lg transform transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                Resolver com Kociemba
+            </button>
+        </div>
 
-            <div class="camera-container">
-                <video id="video" autoplay playsinline></video>
-                <canvas id="canvas"></canvas>
-                <canvas class="overlay-canvas" id="overlay"></canvas>
-                <div class="scan-grid" id="scanGrid">
-                    <div class="scan-cell" data-pos="0"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="1"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="2"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="3"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="4"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="5"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="6"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="7"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="8"><div class="scan-point"></div></div>
+        <!-- Solution Display -->
+        <div id="solution-panel" class="hidden flex-1 bg-gray-900/90 rounded-xl p-3 border border-gray-700 flex flex-col">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Solução Ótima</span>
+                <div class="flex gap-1.5">
+                    <button onclick="prevMove()" class="w-7 h-7 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-xs font-bold transition-colors">←</button>
+                    <button onclick="togglePlay()" id="play-btn" class="w-7 h-7 bg-green-600 hover:bg-green-500 rounded-lg flex items-center justify-center text-xs font-bold transition-colors">▶</button>
+                    <button onclick="nextMove()" class="w-7 h-7 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-xs font-bold transition-colors">→</button>
                 </div>
-                <div class="flash" id="flash"></div>
             </div>
-
-            <div class="detection-preview" id="detectionPreview"></div>
-
-            <div class="controls">
-                <button class="btn btn-primary" id="btnScan">
-                    <span>📷</span> Capturar
-                </button>
-                <button class="btn btn-secondary" id="btnAuto">
-                    <span>🔄</span> Auto-Scan
-                </button>
-                <button class="btn btn-success" id="btnSolve" disabled>
-                    <span>✨</span> Resolver
-                </button>
+            <div class="moves-list flex gap-1.5 overflow-x-auto pb-2 text-xs font-mono mb-2" id="moves-display">
+                <!-- Moves will be inserted here -->
             </div>
-
-            <div class="controls">
-                <button class="btn btn-secondary" id="btnToggleManual">
-                    <span>✏️</span> Editar Manual
-                </button>
-                <button class="btn btn-secondary" id="btnCalibrate">
-                    <span>⚙️</span> Calibrar Cores
-                </button>
-                <button class="btn btn-secondary" id="btnReset">
-                    <span>🗑️</span> Limpar
-                </button>
+            <div class="flex justify-between items-center text-xs text-gray-500 font-mono">
+                <span id="move-counter">Passo 0/0</span>
+                <span id="move-notation" class="text-blue-400 font-bold text-sm"></span>
             </div>
-        </div>
-
-        <div class="cube-preview">
-            <h3>Preview: <span id="currentFaceName">White (Up)</span></h3>
-            <div class="preview-grid" id="previewGrid">
-                <!-- Generated by JS -->
-            </div>
-            <div class="color-picker" id="colorPicker" style="display: none;">
-                <div class="color-option selected" style="background: #ffffff" data-color="white"></div>
-                <div class="color-option" style="background: #ff4444" data-color="red"></div>
-                <div class="color-option" style="background: #44ff44" data-color="green"></div>
-                <div class="color-option" style="background: #ff8844" data-color="orange"></div>
-                <div class="color-option" style="background: #4444ff" data-color="blue"></div>
-                <div class="color-option" style="background: #ffff44" data-color="yellow"></div>
-            </div>
-        </div>
-
-        <div class="calibration-panel" id="calibrationPanel">
-            <h3>🎨 Calibração de Cores</h3>
-            <p style="font-size: 0.9rem; margin-bottom: 10px;">Ajuste a tolerância para cada cor:</p>
-            <div class="calibration-grid" id="calibrationGrid">
-                <!-- Generated by JS -->
-            </div>
-            <div class="controls" style="margin-top: 15px;">
-                <button class="btn btn-primary" id="btnSaveCalib">Salvar</button>
-                <button class="btn btn-secondary" id="btnResetCalib">Resetar</button>
-            </div>
-        </div>
-    </div>
-
-    <button class="settings-toggle" id="btnSettings">⚙️</button>
-    
-    <div class="settings-panel" id="settingsPanel">
-        <h3>Configurações Avançadas</h3>
-        <div style="margin: 20px 0;">
-            <label style="display: block; margin-bottom: 10px;">
-                <input type="checkbox" id="chkAdvancedMode"> Modo Avançado (HSV)
-            </label>
-            <label style="display: block; margin-bottom: 10px;">
-                <input type="checkbox" id="chkAutoWhiteBalance"> Balance de Branco Auto
-            </label>
-            <label style="display: block; margin-bottom: 10px;">
-                Brilho: <input type="range" id="rangeBrightness" min="0.5" max="2" step="0.1" value="1">
-            </label>
-            <label style="display: block; margin-bottom: 10px;">
-                Saturação: <input type="range" id="rangeSaturation" min="0.5" max="2" step="0.1" value="1">
-            </label>
-        </div>
-        <button class="btn btn-secondary" id="btnCloseSettings" style="width: 100%;">Fechar</button>
-    </div>
-
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p style="margin-top: 20px;">Calculando solução...</p>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
         </div>
     </div>
 
     <script>
-        // Cube state management
-        const cubeState = {
-            U: Array(9).fill('white'),
-            R: Array(9).fill('red'),
-            F: Array(9).fill('green'),
-            L: Array(9).fill('orange'),
-            B: Array(9).fill('blue'),
-            D: Array(9).fill('yellow')
+        // Three.js Setup
+        let scene, camera, renderer;
+        let cubeGroup;
+        let stickers = [];
+        let raycaster, mouse;
+        
+        // Cube State - Mapeamento de cores para o solver
+        const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B']; // Ordem do Kociemba
+        const colorMap = {
+            'white': 'U', 'yellow': 'D', 'red': 'R', 
+            'orange': 'L', 'blue': 'F', 'green': 'B',
+            'gray': 'X'
         };
-
-        const faceOrder = ['U', 'R', 'F', 'L', 'B', 'D'];
-        let currentFace = 'U';
-        let isManualMode = false;
+        
+        const colors = {
+            'white': 0xFFFFFF, 'yellow': 0xFFD500, 'red': 0xDC2626,
+            'orange': 0xF97316, 'blue': 0x2563EB, 'green': 0x16A34A,
+            'gray': 0x374151
+        };
+        
+        let currentFace = 'F';
         let selectedColor = 'white';
-        let stream = null;
+        let cubeState = {};
+        let solution = [];
+        let currentMoveIndex = 0;
+        let isPlaying = false;
+        let isSolverReady = false;
+        let playInterval = null;
 
-        // Advanced color detection profiles
-        const colorProfiles = {
-            white: { 
-                rgb: [255, 255, 255], 
-                hsv: {h: [0, 360], s: [0, 30], v: [180, 255]},
-                lab: {l: [90, 100], a: [-10, 10], b: [-10, 10]},
-                tolerance: 35 
-            },
-            red: { 
-                rgb: [255, 68, 68], 
-                hsv: {h: [340, 20], s: [100, 255], v: [100, 255]},
-                lab: {l: [40, 60], a: [40, 80], b: [30, 60]},
-                tolerance: 40 
-            },
-            green: { 
-                rgb: [68, 255, 68], 
-                hsv: {h: [100, 140], s: [100, 255], v: [100, 255]},
-                lab: {l: [50, 70], a: [-60, -20], b: [40, 80]},
-                tolerance: 40 
-            },
-            orange: { 
-                rgb: [255, 136, 68], 
-                hsv: {h: [15, 45], s: [100, 255], v: [150, 255]},
-                lab: {l: [60, 80], a: [20, 60], b: [50, 90]},
-                tolerance: 40 
-            },
-            blue: { 
-                rgb: [68, 68, 255], 
-                hsv: {h: [200, 260], s: [100, 255], v: [100, 255]},
-                lab: {l: [30, 50], a: [10, 50], b: [-80, -40]},
-                tolerance: 40 
-            },
-            yellow: { 
-                rgb: [255, 255, 68], 
-                hsv: {h: [50, 70], s: [100, 255], v: [200, 255]},
-                lab: {l: [85, 95], a: [-20, 20], b: [60, 100]},
-                tolerance: 35 
-            }
-        };
+        // Inicializar estado do cubo
+        faces.forEach(face => {
+            cubeState[face] = Array(9).fill('gray');
+        });
 
-        // DOM Elements
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const overlay = document.getElementById('overlay');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const overlayCtx = overlay.getContext('2d');
-
-        // Initialize camera
-        async function initCamera() {
+        // Inicializar solver
+        async function initSolver() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        advanced: [
-                            { exposureMode: 'manual' },
-                            { whiteBalanceMode: 'manual' }
-                        ]
-                    }
-                });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    overlay.width = video.videoWidth;
-                    overlay.height = video.videoHeight;
-                    startDetectionLoop();
-                };
-            } catch (err) {
-                alert('Erro ao acessar câmera: ' + err.message);
+                updateProgress(30);
+                // O cube-solver expõe uma API global
+                if (typeof cubeSolver !== 'undefined') {
+                    await cubeSolver.initialize('kociemba');
+                    updateProgress(100);
+                    setTimeout(() => {
+                        document.getElementById('loading-overlay').style.display = 'none';
+                        isSolverReady = true;
+                    }, 500);
+                } else {
+                    throw new Error('Solver não carregado');
+                }
+            } catch (e) {
+                console.error('Erro ao inicializar solver:', e);
+                document.querySelector('#loading-overlay h2').textContent = 'Erro ao carregar solver';
+                document.querySelector('#loading-overlay p').textContent = 'Recarregue a página ou verifique sua conexão.';
             }
         }
 
-        // Advanced color detection algorithm
-        function detectColor(r, g, b) {
-            const hsv = rgbToHsv(r, g, b);
-            const lab = rgbToLab(r, g, b);
+        function updateProgress(percent) {
+            document.getElementById('progress-bar').style.width = percent + '%';
+        }
+
+        function init() {
+            const container = document.getElementById('canvas-container');
             
-            let bestMatch = null;
-            let bestScore = -1;
-            let confidence = 0;
-
-            for (const [colorName, profile] of Object.entries(colorProfiles)) {
-                let score = 0;
-                let checks = 0;
-
-                // HSV Check with hue wrapping for red
-                if (profile.hsv) {
-                    let hMatch = false;
-                    if (colorName === 'red' && (hsv.h > 340 || hsv.h < 20)) {
-                        hMatch = true;
-                    } else if (hsv.h >= profile.hsv.h[0] && hsv.h <= profile.hsv.h[1]) {
-                        hMatch = true;
-                    }
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111827);
+            
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(0, 0, 13);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+            
+            // Iluminação dramática
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+            mainLight.position.set(5, 10, 7);
+            scene.add(mainLight);
+            
+            const fillLight = new THREE.DirectionalLight(0x4B5563, 0.5);
+            fillLight.position.set(-5, 0, -5);
+            scene.add(fillLight);
+            
+            const rimLight = new THREE.DirectionalLight(0x60A5FA, 0.3);
+            rimLight.position.set(0, -5, 5);
+            scene.add(rimLight);
+            
+            createCube();
+            
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            
+            // Eventos de interação
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('touchstart', onTouchStart, {passive: false});
+            
+            // Controles de rotação manual
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+            
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaMove = {
+                        x: e.clientX - previousMousePosition.x,
+                        y: e.clientY - previousMousePosition.y
+                    };
                     
-                    if (hMatch) score += 2;
-                    if (hsv.s >= profile.hsv.s[0] && hsv.s <= profile.hsv.s[1]) score += 1;
-                    if (hsv.v >= profile.hsv.v[0] && hsv.v <= profile.hsv.v[1]) score += 1;
-                    checks += 4;
+                    cubeGroup.rotation.y += deltaMove.x * 0.01;
+                    cubeGroup.rotation.x += deltaMove.y * 0.01;
+                    
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
                 }
-
-                // LAB Check (perceptual uniformity)
-                if (profile.lab) {
-                    if (lab.l >= profile.lab.l[0] && lab.l <= profile.lab.l[1]) score += 1;
-                    if (lab.a >= profile.lab.a[0] && lab.a <= profile.lab.a[1]) score += 1;
-                    if (lab.b >= profile.lab.b[0] && lab.b <= profile.lab.b[1]) score += 1;
-                    checks += 3;
-                }
-
-                // RGB Euclidean distance with weight
-                const rgbDist = Math.sqrt(
-                    Math.pow(r - profile.rgb[0], 2) * 0.3 +
-                    Math.pow(g - profile.rgb[1], 2) * 0.5 +
-                    Math.pow(b - profile.rgb[2], 2) * 0.2
-                );
-                
-                const rgbScore = Math.max(0, 1 - (rgbDist / (profile.tolerance * 3)));
-                score += rgbScore * 3;
-                checks += 3;
-
-                const finalScore = score / checks;
-                
-                if (finalScore > bestScore) {
-                    bestScore = finalScore;
-                    bestMatch = colorName;
-                    confidence = finalScore;
-                }
-            }
-
-            // Special handling for white vs light colors
-            if (bestMatch !== 'white' && r > 200 && g > 200 && b > 200) {
-                if (Math.abs(r - g) < 20 && Math.abs(g - b) < 20) {
-                    bestMatch = 'white';
-                    confidence = 0.9;
-                }
-            }
-
-            return { color: bestMatch, confidence: confidence };
+            });
+            
+            renderer.domElement.addEventListener('mouseup', () => isDragging = false);
+            
+            animate();
+            window.addEventListener('resize', onWindowResize);
+            
+            // Iniciar solver
+            initSolver();
         }
 
-        // Color space conversions
-        function rgbToHsv(r, g, b) {
-            r /= 255; g /= 255; b /= 255;
-            const max = Math.max(r, g, b), min = Math.min(r, g, b);
-            let h, s, v = max;
-            const d = max - min;
-            s = max === 0 ? 0 : d / max;
+        function createCube() {
+            cubeGroup = new THREE.Group();
+            scene.add(cubeGroup);
+            
+            // Criar cubies 3x3x3
+            const geometry = new THREE.BoxGeometry(0.92, 0.92, 0.92);
+            const edgesGeometry = new THREE.EdgesGeometry(geometry);
+            
+            for(let x = -1; x <= 1; x++) {
+                for(let y = -1; y <= 1; y++) {
+                    for(let z = -1; z <= 1; z++) {
+                        if(x === 0 && y === 0 && z === 0) continue;
+                        
+                        const material = new THREE.MeshPhongMaterial({ 
+                            color: 0x1F2937,
+                            shininess: 80,
+                            specular: 0x374151
+                        });
+                        
+                        const cubie = new THREE.Mesh(geometry, material);
+                        cubie.position.set(x * 1.02, y * 1.02, z * 1.02);
+                        cubie.castShadow = true;
+                        cubie.receiveShadow = true;
+                        
+                        // Bordas estilizadas
+                        const edges = new THREE.LineSegments(
+                            edgesGeometry, 
+                            new THREE.LineBasicMaterial({ color: 0x111827, linewidth: 3 })
+                        );
+                        cubie.add(edges);
+                        
+                        // Adicionar stickers nas faces externas
+                        const stickerSize = 0.75;
+                        const stickerGeo = new THREE.PlaneGeometry(stickerSize, stickerSize);
+                        
+                        // Mapeamento de faces
+                        if(z === 1) createSticker(cubie, stickerGeo, 'F', 0, 0, 0.47, 0, 0, 0, x, y);
+                        if(z === -1) createSticker(cubie, stickerGeo, 'B', 0, 0, -0.47, 0, Math.PI, 0, -x, y);
+                        if(y === 1) createSticker(cubie, stickerGeo, 'U', 0, 0.47, 0, -Math.PI/2, 0, 0, x, -z);
+                        if(y === -1) createSticker(cubie, stickerGeo, 'D', 0, -0.47, 0, Math.PI/2, 0, 0, x, z);
+                        if(x === -1) createSticker(cubie, stickerGeo, 'L', -0.47, 0, 0, 0, -Math.PI/2, 0, -z, y);
+                        if(x === 1) createSticker(cubie, stickerGeo, 'R', 0.47, 0, 0, 0, Math.PI/2, 0, z, y);
+                        
+                        cubeGroup.add(cubie);
+                    }
+                }
+            }
+        }
 
-            if (max === min) {
-                h = 0;
+        function createSticker(parent, geo, face, x, y, z, rx, ry, rz, posX, posY) {
+            const material = new THREE.MeshPhongMaterial({ 
+                color: colors.gray,
+                shininess: 120,
+                specular: 0x666666,
+                emissive: 0x000000,
+                emissiveIntensity: 0.1
+            });
+            
+            const sticker = new THREE.Mesh(geo, material);
+            sticker.position.set(x, y, z);
+            sticker.rotation.set(rx, ry, rz);
+            
+            // Calcular índice na face (0-8)
+            let index;
+            if(face === 'F' || face === 'B') {
+                index = (1 - posY) * 3 + (posX + 1);
+            } else if(face === 'U' || face === 'D') {
+                index = (1 - posY) * 3 + (posX + 1);
             } else {
-                switch (max) {
-                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                    case g: h = (b - r) / d + 2; break;
-                    case b: h = (r - g) / d + 4; break;
-                }
-                h /= 6;
+                index = (1 - posY) * 3 + (posX + 1);
             }
-            return { h: h * 360, s: s * 255, v: v * 255 };
+            
+            sticker.userData = { face: face, index: Math.floor(index), isSticker: true };
+            parent.add(sticker);
+            stickers.push(sticker);
         }
 
-        function rgbToLab(r, g, b) {
-            // Simplified RGB to LAB conversion
-            let x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
-            let y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
-            let z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
-
-            x /= 95.047; y /= 100.0; z /= 108.883;
-            
-            const transform = (t) => t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
-            
-            x = transform(x); y = transform(y); z = transform(z);
-            
-            return {
-                l: 116 * y - 16,
-                a: 500 * (x - y),
-                b: 200 * (y - z)
-            };
-        }
-
-        // Real-time detection loop
-        function startDetectionLoop() {
-            function loop() {
-                if (!isManualMode) {
-                    detectFrame();
-                }
-                requestAnimationFrame(loop);
-            }
-            loop();
-        }
-
-        function detectFrame() {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            const grid = document.getElementById('scanGrid');
-            const cells = grid.querySelectorAll('.scan-cell');
-            const preview = document.getElementById('detectionPreview');
-            
-            // Clear previous detection preview occasionally
-            if (Math.random() < 0.1) preview.innerHTML = '';
-
-            cells.forEach((cell, index) => {
-                const rect = cell.getBoundingClientRect();
-                const containerRect = document.querySelector('.camera-container').getBoundingClientRect();
+        function updateCubeColors() {
+            stickers.forEach(sticker => {
+                const face = sticker.userData.face;
+                const index = sticker.userData.index;
+                const colorName = cubeState[face][index];
                 
-                const x = ((rect.left - containerRect.left) / containerRect.width) * canvas.width;
-                const y = ((rect.top - containerRect.top) / containerRect.height) * canvas.height;
-                const w = (rect.width / containerRect.width) * canvas.width;
-                const h = (rect.height / containerRect.height) * canvas.height;
-
-                // Sample center region for better accuracy
-                const sampleX = Math.floor(x + w * 0.3);
-                const sampleY = Math.floor(y + h * 0.3);
-                const sampleW = Math.floor(w * 0.4);
-                const sampleH = Math.floor(h * 0.4);
-
-                try {
-                    const frame = ctx.getImageData(sampleX, sampleY, sampleW, sampleH);
-                    const result = analyzeRegion(frame);
-                    
-                    // Visual feedback
-                    if (result.confidence > 0.6) {
-                        cell.style.background = `rgba(${getColorRGB(result.color)}, 0.3)`;
-                        cell.style.borderColor = getColorHex(result.color);
-                    } else {
-                        cell.style.background = 'rgba(255,255,255,0.05)';
-                        cell.style.borderColor = 'rgba(255,255,255,0.3)';
-                    }
-
-                    // Update preview occasionally
-                    if (index === 4 && Math.random() < 0.2) {
-                        updateDetectionPreview(result);
-                    }
-                } catch (e) {
-                    // Ignore out of bounds errors
+                if(colors[colorName]) {
+                    sticker.material.color.setHex(colors[colorName]);
+                    sticker.material.emissive.setHex(colors[colorName]);
+                    sticker.material.emissiveIntensity = colorName === 'gray' ? 0 : 0.15;
                 }
             });
         }
 
-        function analyzeRegion(imageData) {
-            const data = imageData.data;
-            const len = data.length;
-            let r = 0, g = 0, b = 0;
-            let count = 0;
+        function onPointerDown(event) {
+            event.preventDefault();
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            handleInteraction();
+        }
 
-            // Skip alpha and sample every 4th pixel for performance
-            for (let i = 0; i < len; i += 16) {
-                r += data[i];
-                g += data[i + 1];
-                b += data[i + 2];
-                count++;
+        function onTouchStart(event) {
+            event.preventDefault();
+            if(event.touches.length > 0) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.touches[0].clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.touches[0].clientY - rect.top) / rect.height) * 2 + 1;
+                handleInteraction();
             }
+        }
 
-            r = Math.round(r / count);
-            g = Math.round(g / count);
-            b = Math.round(b / count);
-
-            // Apply brightness/saturation adjustments
-            const brightness = parseFloat(document.getElementById('rangeBrightness').value);
-            const saturation = parseFloat(document.getElementById('rangeSaturation').value);
+        function handleInteraction() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(stickers);
             
-            r = Math.min(255, r * brightness);
-            g = Math.min(255, g * brightness);
-            b = Math.min(255, b * brightness);
-
-            return detectColor(r, g, b);
-        }
-
-        function getColorRGB(colorName) {
-            const colors = {
-                white: '255,255,255', red: '255,68,68', green: '68,255,68',
-                orange: '255,136,68', blue: '68,68,255', yellow: '255,255,68'
-            };
-            return colors[colorName] || '128,128,128';
-        }
-
-        function getColorHex(colorName) {
-            const colors = {
-                white: '#ffffff', red: '#ff4444', green: '#44ff44',
-                orange: '#ff8844', blue: '#4444ff', yellow: '#ffff44'
-            };
-            return colors[colorName] || '#888888';
-        }
-
-        function updateDetectionPreview(result) {
-            const preview = document.getElementById('detectionPreview');
-            const div = document.createElement('div');
-            div.className = 'detected-color';
-            div.style.background = getColorHex(result.color);
-            div.innerHTML = `<div class="confidence-bar"><div class="confidence-fill" style="width: ${result.confidence * 100}%"></div></div>`;
-            
-            if (preview.children.length > 8) {
-                preview.removeChild(preview.firstChild);
-            }
-            preview.appendChild(div);
-        }
-
-        // Capture current frame
-        function captureFrame() {
-            const flash = document.getElementById('flash');
-            flash.classList.add('active');
-            setTimeout(() => flash.classList.remove('active'), 100);
-
-            const cells = document.querySelectorAll('.scan-cell');
-            const faceData = [];
-
-            cells.forEach((cell, index) => {
-                const rect = cell.getBoundingClientRect();
-                const containerRect = document.querySelector('.camera-container').getBoundingClientRect();
+            if(intersects.length > 0) {
+                const sticker = intersects[0].object;
+                if(!sticker.userData.isSticker) return;
                 
-                const x = ((rect.left - containerRect.left) / containerRect.width) * canvas.width;
-                const y = ((rect.top - containerRect.top) / containerRect.height) * canvas.height;
-                const w = (rect.width / containerRect.width) * canvas.width;
-                const h = (rect.height / containerRect.height) * canvas.height;
-
-                const sampleX = Math.floor(x + w * 0.3);
-                const sampleY = Math.floor(y + h * 0.3);
-                const sampleW = Math.floor(w * 0.4);
-                const sampleH = Math.floor(h * 0.4);
-
-                try {
-                    const frame = ctx.getImageData(sampleX, sampleY, sampleW, sampleH);
-                    const result = analyzeRegion(frame);
-                    faceData[index] = result.confidence > 0.5 ? result.color : 'unknown';
-                } catch (e) {
-                    faceData[index] = 'unknown';
+                const face = sticker.userData.face;
+                const index = sticker.userData.index;
+                
+                // Se clicou em outra face, muda para ela
+                if(face !== currentFace) {
+                    selectFace(face);
                 }
-            });
-
-            // Validate center color matches expected face
-            const expectedCenter = document.querySelector('.face-btn.active').dataset.color;
-            if (faceData[4] !== expectedCenter && faceData[4] !== 'unknown') {
-                if (!confirm(`Cor central detectada (${faceData[4]}) diferente do esperado (${expectedCenter}). Continuar mesmo assim?`)) {
-                    return;
-                }
-            }
-
-            cubeState[currentFace] = faceData;
-            updatePreview();
-            checkCompletion();
-            
-            // Auto-advance to next face
-            const currentIndex = faceOrder.indexOf(currentFace);
-            if (currentIndex < 5) {
-                setTimeout(() => selectFace(faceOrder[currentIndex + 1]), 500);
+                
+                // Aplica cor
+                cubeState[face][index] = selectedColor;
+                updateCubeColors();
+                
+                // Feedback visual
+                sticker.scale.set(0.9, 0.9, 0.9);
+                setTimeout(() => {
+                    sticker.scale.set(1, 1, 1);
+                }, 100);
             }
         }
 
-        // Auto-scan all faces
-        async function autoScan() {
-            const btn = document.getElementById('btnAuto');
-            btn.disabled = true;
-            btn.innerHTML = '<span>⏳</span> Escaneando...';
-
-            for (let i = 0; i < faceOrder.length; i++) {
-                selectFace(faceOrder[i]);
-                await new Promise(r => setTimeout(r, 800));
-                captureFrame();
-                await new Promise(r => setTimeout(r, 500));
-            }
-
-            btn.disabled = false;
-            btn.innerHTML = '<span>🔄</span> Auto-Scan';
-        }
-
-        // UI Functions
         function selectFace(face) {
             currentFace = face;
+            
+            // Atualizar UI
             document.querySelectorAll('.face-btn').forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.dataset.face === face) btn.classList.add('active');
             });
+            document.getElementById(`btn-${face}`).classList.add('active');
             
-            const names = {U: 'White (Up)', R: 'Red (Right)', F: 'Green (Front)', 
-                          L: 'Orange (Left)', B: 'Blue (Back)', D: 'Yellow (Down)'};
-            document.getElementById('currentFaceName').textContent = names[face];
-            updatePreview();
-        }
-
-        function updatePreview() {
-            const grid = document.getElementById('previewGrid');
-            grid.innerHTML = '';
+            const faceNames = {U: 'UP (Branco)', D: 'DOWN (Amarelo)', F: 'FRONT (Azul)', 
+                             B: 'BACK (Verde)', L: 'LEFT (Laranja)', R: 'RIGHT (Vermelho)'};
+            document.getElementById('instruction-text').textContent = 
+                `Toque para colorir: ${faceNames[face]}`;
             
-            cubeState[currentFace].forEach((color, index) => {
-                const div = document.createElement('div');
-                div.className = 'preview-cell';
-                div.style.background = getColorHex(color);
-                div.dataset.index = index;
-                div.onclick = () => {
-                    if (isManualMode) {
-                        cubeState[currentFace][index] = selectedColor;
-                        updatePreview();
-                        checkCompletion();
-                    }
-                };
-                grid.appendChild(div);
-            });
-
-            // Update face button status
-            const faceBtn = document.querySelector(`.face-btn[data-face="${currentFace}"]`);
-            const isComplete = cubeState[currentFace].every(c => c !== 'unknown');
-            faceBtn.classList.toggle('completed', isComplete);
-        }
-
-        function checkCompletion() {
-            const allComplete = faceOrder.every(face => 
-                cubeState[face].every(c => c !== 'unknown')
-            );
-            document.getElementById('btnSolve').disabled = !allComplete;
-        }
-
-        // Manual mode toggle
-        document.getElementById('btnToggleManual').addEventListener('click', () => {
-            isManualMode = !isManualMode;
-            document.getElementById('colorPicker').style.display = isManualMode ? 'flex' : 'none';
-            document.getElementById('btnToggleManual').innerHTML = 
-                isManualMode ? '<span>📷</span> Modo Câmera' : '<span>✏️</span> Editar Manual';
-        });
-
-        // Color picker
-        document.querySelectorAll('.color-option').forEach(opt => {
-            opt.addEventListener('click', () => {
-                document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
-                opt.classList.add('selected');
-                selectedColor = opt.dataset.color;
-            });
-        });
-
-        // Face buttons
-        document.querySelectorAll('.face-btn').forEach(btn => {
-            btn.addEventListener('click', () => selectFace(btn.dataset.face));
-        });
-
-        // Main controls
-        document.getElementById('btnScan').addEventListener('click', captureFrame);
-        document.getElementById('btnAuto').addEventListener('click', autoScan);
-        document.getElementById('btnReset').addEventListener('click', () => {
-            if (confirm('Limpar todo o cubo?')) {
-                faceOrder.forEach(face => {
-                    cubeState[face] = Array(9).fill('unknown');
-                });
-                document.querySelectorAll('.face-btn').forEach(btn => btn.classList.remove('completed'));
-                updatePreview();
-                checkCompletion();
-            }
-        });
-
-        // Settings panel
-        document.getElementById('btnSettings').addEventListener('click', () => {
-            document.getElementById('settingsPanel').classList.add('open');
-        });
-        document.getElementById('btnCloseSettings').addEventListener('click', () => {
-            document.getElementById('settingsPanel').classList.remove('open');
-        });
-
-        // Calibration
-        document.getElementById('btnCalibrate').addEventListener('click', () => {
-            const panel = document.getElementById('calibrationPanel');
-            panel.classList.toggle('active');
+            // Rotação suave para mostrar a face
+            const targetRotations = {
+                'F': {x: 0, y: 0},
+                'B': {x: 0, y: Math.PI},
+                'U': {x: -Math.PI/2, y: 0},
+                'D': {x: Math.PI/2, y: 0},
+                'L': {x: 0, y: -Math.PI/2},
+                'R': {x: 0, y: Math.PI/2}
+            };
             
-            if (panel.classList.contains('active')) {
-                const grid = document.getElementById('calibrationGrid');
-                grid.innerHTML = '';
+            const target = targetRotations[face];
+            const start = {x: cubeGroup.rotation.x, y: cubeGroup.rotation.y};
+            const startTime = Date.now();
+            const duration = 600;
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 4);
                 
-                Object.entries(colorProfiles).forEach(([name, profile]) => {
-                    const div = document.createElement('div');
-                    div.className = 'calib-item';
-                    div.innerHTML = `
-                        <div class="color-sample" style="background: rgb(${profile.rgb.join(',')})"></div>
-                        <div style="flex: 1;">
-                            <div style="text-transform: capitalize; font-weight: bold;">${name}</div>
-                            <input type="range" class="tolerance-slider" 
-                                   min="20" max="60" value="${profile.tolerance}" 
-                                   data-color="${name}">
-                        </div>
-                    `;
-                    grid.appendChild(div);
-                });
+                cubeGroup.rotation.x = start.x + (target.x - start.x) * ease;
+                cubeGroup.rotation.y = start.y + (target.y - start.y) * ease;
+                
+                if(progress < 1) requestAnimationFrame(animate);
             }
-        });
-
-        document.getElementById('btnSaveCalib').addEventListener('click', () => {
-            document.querySelectorAll('.tolerance-slider').forEach(slider => {
-                const color = slider.dataset.color;
-                colorProfiles[color].tolerance = parseInt(slider.value);
-            });
-            document.getElementById('calibrationPanel').classList.remove('active');
-            alert('Calibração salva!');
-        });
-
-        document.getElementById('btnResetCalib').addEventListener('click', () => {
-            location.reload(); // Simple reset
-        });
-
-        // Solve function (simplified - would integrate with actual solver)
-        document.getElementById('btnSolve').addEventListener('click', async () => {
-            const loading = document.getElementById('loading');
-            loading.classList.add('active');
-            
-            // Simulate solving process
-            const progress = document.getElementById('progressFill');
-            for (let i = 0; i <= 100; i += 10) {
-                progress.style.width = i + '%';
-                await new Promise(r => setTimeout(r, 200));
-            }
-            
-            // Here you would integrate with a real solver like Kociemba
-            // For demo, we'll just show the cube state
-            console.log('Cube state:', cubeState);
-            
-            loading.classList.remove('active');
-            
-            // Generate solution URL or display steps
-            const solution = generateSolution(cubeState);
-            alert(`Solução calculada!\n\n${solution}\n\n(Integração completa com algoritmo Kociemba necessária para solução ótima)`);
-        });
-
-        function generateSolution(state) {
-            // This is a placeholder - real implementation would use Kociemba or similar
-            return "R U R' U' (Exemplo de movimento)\nIntegrar com biblioteca de resolução para solução completa em ~20 movimentos.";
+            animate();
         }
 
-        // Initialize
-        initCamera();
-        updatePreview();
+        function selectColor(color) {
+            selectedColor = color;
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.getElementById(`color-${color}`).classList.add('selected');
+        }
 
-        // Handle visibility change
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && stream) {
-                stream.getTracks().forEach(track => track.pause());
-            } else if (stream) {
-                stream.getTracks().forEach(track => track.resume());
+        function resetCube() {
+            faces.forEach(face => {
+                cubeState[face] = Array(9).fill('gray');
+            });
+            updateCubeColors();
+            hideSolution();
+            updateStatus('Cubo resetado. Comece a colorir!');
+        }
+
+        function randomizeCube() {
+            const colorList = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
+            faces.forEach(face => {
+                // Garantir que cada face tenha 9 stickers da mesma cor (cubo válido)
+                const faceColor = colorList[Math.floor(Math.random() * colorList.length)];
+                cubeState[face] = Array(9).fill(faceColor);
+            });
+            updateCubeColors();
+            updateStatus('Cubo aleatório gerado!');
+        }
+
+        function getFaceletString() {
+            // Converter estado do cubo para string de facelets (ordem Kociemba: URFDLB)
+            let faceletStr = '';
+            
+            // Mapeamento correto de posições
+            const faceMapping = {
+                'U': cubeState['U'],
+                'R': cubeState['R'],
+                'F': cubeState['F'],
+                'D': cubeState['D'],
+                'L': cubeState['L'],
+                'B': cubeState['B']
+            };
+            
+            // Ordem das faces: U R F D L B
+            const order = ['U', 'R', 'F', 'D', 'L', 'B'];
+            
+            order.forEach(face => {
+                faceMapping[face].forEach(color => {
+                    faceletStr += colorMap[color] || 'X';
+                });
+            });
+            
+            return faceletStr;
+        }
+
+        function validateCube() {
+            // Verificar se todas as faces estão completamente coloridas
+            for(let face of faces) {
+                for(let i = 0; i < 9; i++) {
+                    if(cubeState[face][i] === 'gray') {
+                        return {valid: false, message: `Face ${face} não está completa!`};
+                    }
+                }
             }
-        });
+            
+            // Verificar se tem exatamente 9 de cada cor
+            const colorCount = {};
+            faces.forEach(face => {
+                cubeState[face].forEach(color => {
+                    colorCount[color] = (colorCount[color] || 0) + 1;
+                });
+            });
+            
+            const expectedColors = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
+            for(let color of expectedColors) {
+                if(colorCount[color] !== 9) {
+                    return {valid: false, message: `Quantidade incorreta da cor ${color}!`};
+                }
+            }
+            
+            return {valid: true};
+        }
+
+        async function validateAndSolve() {
+            if(!isSolverReady) {
+                alert('Solver ainda está inicializando. Aguarde...');
+                return;
+            }
+            
+            const validation = validateCube();
+            if(!validation.valid) {
+                alert(validation.message);
+                return;
+            }
+            
+            const faceletStr = getFaceletString();
+            console.log('Facelet string:', faceletStr);
+            
+            updateStatus('Resolvendo com Kociemba...');
+            document.getElementById('solve-btn').disabled = true;
+            document.getElementById('solve-btn').textContent = 'Resolvendo...';
+            
+            try {
+                // Usar o solver Kociemba
+                const result = await cubeSolver.solve(faceletStr, 'kociemba');
+                
+                if(result && result.length > 0) {
+                    solution = result.split(' ').filter(m => m.length > 0);
+                    currentMoveIndex = 0;
+                    displaySolution();
+                    updateStatus(`Solução encontrada: ${solution.length} movimentos`);
+                } else {
+                    throw new Error('Solução vazia');
+                }
+            } catch (error) {
+                console.error('Erro ao resolver:', error);
+                alert('Erro ao resolver o cubo. Verifique se as cores estão corretas.');
+                updateStatus('Erro na solução');
+            } finally {
+                document.getElementById('solve-btn').disabled = false;
+                document.getElementById('solve-btn').textContent = 'Resolver com Kociemba';
+            }
+        }
+
+        function displaySolution() {
+            const panel = document.getElementById('solution-panel');
+            panel.classList.remove('hidden');
+            
+            const container = document.getElementById('moves-display');
+            container.innerHTML = '';
+            
+            solution.forEach((move, idx) => {
+                const span = document.createElement('span');
+                span.className = `move-text px-2 py-1 rounded-lg font-bold text-xs cursor-pointer transition-all ${idx === 0 ? 'bg-blue-500 text-white scale-110' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`;
+                span.textContent = move;
+                span.onclick = () => jumpToMove(idx);
+                container.appendChild(span);
+            });
+            
+            updateMoveInfo();
+            scrollToCurrentMove();
+        }
+
+        function hideSolution() {
+            document.getElementById('solution-panel').classList.add('hidden');
+            solution = [];
+            currentMoveIndex = 0;
+            if(playInterval) clearInterval(playInterval);
+            isPlaying = false;
+            updatePlayButton();
+        }
+
+        function updateMoveInfo() {
+            document.getElementById('move-counter').textContent = `Passo ${currentMoveIndex + 1}/${solution.length}`;
+            document.getElementById('move-notation').textContent = solution[currentMoveIndex] || '';
+        }
+
+        function scrollToCurrentMove() {
+            const moves = document.getElementById('moves-display').children;
+            if(moves[currentMoveIndex]) {
+                moves[currentMoveIndex].scrollIntoView({behavior: 'smooth', inline: 'center', block: 'nearest'});
+            }
+        }
+
+        function highlightCurrentMove() {
+            const moves = document.getElementById('moves-display').children;
+            Array.from(moves).forEach((move, idx) => {
+                if(idx === currentMoveIndex) {
+                    move.className = 'move-text px-2 py-1 rounded-lg font-bold text-xs cursor-pointer transition-all bg-blue-500 text-white scale-110';
+                } else if(idx < currentMoveIndex) {
+                    move.className = 'move-text px-2 py-1 rounded-lg font-bold text-xs cursor-pointer transition-all bg-green-600/50 text-green-200';
+                } else {
+                    move.className = 'move-text px-2 py-1 rounded-lg font-bold text-xs cursor-pointer transition-all bg-gray-700 text-gray-300 hover:bg-gray-600';
+                }
+            });
+            scrollToCurrentMove();
+            updateMoveInfo();
+        }
+
+        function jumpToMove(index) {
+            if(index === currentMoveIndex) return;
+            
+            // Executar movimentos até o índice desejado
+            if(index > currentMoveIndex) {
+                for(let i = currentMoveIndex; i < index; i++) {
+                    executeMoveAnimation(solution[i]);
+                }
+            } else {
+                // Voltar movimentos (inverso)
+                for(let i = currentMoveIndex - 1; i >= index; i--) {
+                    const inverse = getInverseMove(solution[i]);
+                    executeMoveAnimation(inverse);
+                }
+            }
+            
+            currentMoveIndex = index;
+            highlightCurrentMove();
+        }
+
+        function nextMove() {
+            if(currentMoveIndex < solution.length) {
+                executeMoveAnimation(solution[currentMoveIndex]);
+                currentMoveIndex++;
+                highlightCurrentMove();
+            }
+        }
+
+        function prevMove() {
+            if(currentMoveIndex > 0) {
+                currentMoveIndex--;
+                const inverse = getInverseMove(solution[currentMoveIndex]);
+                executeMoveAnimation(inverse);
+                highlightCurrentMove();
+            }
+        }
+
+        function getInverseMove(move) {
+            if(move.includes('2')) return move; // 180 graus é próprio inverso
+            if(move.includes("'")) return move.replace("'", "");
+            return move + "'";
+        }
+
+        function togglePlay() {
+            if(isPlaying) {
+                stopPlay();
+            } else {
+                startPlay();
+            }
+        }
+
+        function startPlay() {
+            isPlaying = true;
+            updatePlayButton();
+            
+            if(currentMoveIndex >= solution.length) {
+                currentMoveIndex = 0;
+            }
+            
+            playInterval = setInterval(() => {
+                if(currentMoveIndex >= solution.length) {
+                    stopPlay();
+                    return;
+                }
+                nextMove();
+            }, 800);
+        }
+
+        function stopPlay() {
+            isPlaying = false;
+            if(playInterval) {
+                clearInterval(playInterval);
+                playInterval = null;
+            }
+            updatePlayButton();
+        }
+
+        function updatePlayButton() {
+            const btn = document.getElementById('play-btn');
+            btn.textContent = isPlaying ? '⏸' : '▶';
+        }
+
+        function executeMoveAnimation(move) {
+            // Animação visual do movimento no cubo 3D
+            const face = move.charAt(0);
+            const clockwise = !move.includes("'");
+            const double = move.includes("2");
+            
+            const axisMap = {
+                'U': {axis: 'y', layer: 1, angle: -1},
+                'D': {axis: 'y', layer: -1, angle: 1},
+                'F': {axis: 'z', layer: 1, angle: -1},
+                'B': {axis: 'z', layer: -1, angle: 1},
+                'L': {axis: 'x', layer: -1, angle: 1},
+                'R': {axis: 'x', layer: 1, angle: -1}
+            };
+            
+            const info = axisMap[face];
+            if(!info) return;
+            
+            const angle = info.angle * (clockwise ? 1 : -1) * Math.PI/2 * (double ? 2 : 1);
+            animateFaceRotation(info.axis, info.layer, angle);
+        }
+
+        function animateFaceRotation(axis, layer, angle) {
+            const threshold = 0.5;
+            const cubiesToRotate = [];
+            
+            cubeGroup.children.forEach(child => {
+                const pos = child.position;
+                let inLayer = false;
+                
+                if(axis === 'x' && Math.abs(pos.x - layer * 1.02) < threshold) inLayer = true;
+                if(axis === 'y' && Math.abs(pos.y - layer * 1.02) < threshold) inLayer = true;
+                if(axis === 'z' && Math.abs(pos.z - layer * 1.02) < threshold) inLayer = true;
+                
+                if(inLayer) cubiesToRotate.push(child);
+            });
+            
+            const pivot = new THREE.Group();
+            scene.add(pivot);
+            
+            cubiesToRotate.forEach(cubie => {
+                pivot.attach(cubie);
+            });
+            
+            const duration = 400;
+            const start = Date.now();
+            const startRot = pivot.rotation[axis];
+            
+            function animate() {
+                const elapsed = Date.now() - start;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 4);
+                
+                pivot.rotation[axis] = startRot + angle * ease;
+                
+                if(progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    cubiesToRotate.forEach(cubie => {
+                        cubeGroup.attach(cubie);
+                    });
+                    scene.remove(pivot);
+                }
+            }
+            animate();
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status-text').textContent = text;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotação idle sutil
+            if(!isPlaying && cubeGroup) {
+                cubeGroup.rotation.y += 0.001;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // Inicialização
+        init();
+        selectColor('white');
+        selectFace('F');
     </script>
 </body>
 </html>
