@@ -181,55 +181,68 @@
             50% { transform: scale(0.95); }
         }
         
+        /* Progresso com nomes e cores */
         .progress-top {
             position: absolute;
-            top: 16px;
+            top: 12px;
             left: 0; right: 0;
             display: flex;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
             z-index: 20;
-            padding: 0 20px;
+            padding: 0 10px;
+            flex-wrap: wrap;
+        }
+        
+        .progress-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            opacity: 0.4;
+            transition: all 0.3s;
+        }
+        
+        .progress-item.active {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+        
+        .progress-item.done {
+            opacity: 0.9;
         }
         
         .progress-dot {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             border: 2px solid rgba(255,255,255,0.3);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
-            opacity: 0.4;
-            transition: all 0.3s;
-            position: relative;
             background: rgba(255,255,255,0.05);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
         
-        .progress-dot.active {
-            opacity: 1;
+        .progress-item.active .progress-dot {
+            border-color: currentColor;
+            box-shadow: 0 0 15px currentColor;
             transform: scale(1.1);
-            border-color: #3b82f6;
-            box-shadow: 0 0 15px rgba(59,130,246,0.5);
         }
         
-        .progress-dot.done {
-            opacity: 0.9;
+        .progress-item.done .progress-dot {
             border-color: #22c55e;
             background: rgba(34,197,94,0.2);
         }
         
-        .progress-dot::after {
-            content: attr(data-label);
-            position: absolute;
-            bottom: -18px;
+        .progress-label {
             font-size: 9px;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            white-space: nowrap;
-            color: rgba(255,255,255,0.5);
+            letter-spacing: 0.3px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
         
         .status-area {
@@ -356,15 +369,15 @@
 <body>
 
     <div class="app-header">
-        <div class="header-title" id="header-title">Mostre a face VERDE</div>
+        <div class="header-title" id="header-title">Mostre a FRENTE (Verde)</div>
         <div class="header-subtitle" id="face-counter">1/6</div>
     </div>
 
     <div class="main-container">
         <div class="cube-section">
-            <div class="cube-label">Cubo 3D</div>
+            <div class="cube-label">Cubo 3D - Centros de Referência</div>
             <div id="cube-3d-container"></div>
-            <div class="cube-hint">Gire para visualizar</div>
+            <div class="cube-hint">Gire para visualizar todas as faces</div>
         </div>
 
         <div class="camera-section">
@@ -376,13 +389,32 @@
             </div>
             
             <div class="scan-overlay" id="scan-overlay">
-                <div class="progress-top">
-                    <div class="progress-dot active" data-face="F" data-label="F">F</div>
-                    <div class="progress-dot" data-face="R" data-label="R">R</div>
-                    <div class="progress-dot" data-face="B" data-label="B">B</div>
-                    <div class="progress-dot" data-face="L" data-label="L">L</div>
-                    <div class="progress-dot" data-face="U" data-label="U">U</div>
-                    <div class="progress-dot" data-face="D" data-label="D">D</div>
+                <!-- Progresso com nomes em português e cores -->
+                <div class="progress-top" id="progress-container">
+                    <div class="progress-item active" data-face="F" style="color: #00FF00;">
+                        <div class="progress-dot" style="color: #00FF00; border-color: #00FF00;">F</div>
+                        <span class="progress-label" style="color: #00FF00;">Frente</span>
+                    </div>
+                    <div class="progress-item" data-face="R" style="color: #FF0000;">
+                        <div class="progress-dot" style="color: #FF0000; border-color: #FF0000;">R</div>
+                        <span class="progress-label" style="color: #FF0000;">Direita</span>
+                    </div>
+                    <div class="progress-item" data-face="B" style="color: #0000FF;">
+                        <div class="progress-dot" style="color: #0000FF; border-color: #0000FF;">B</div>
+                        <span class="progress-label" style="color: #0000FF;">Trás</span>
+                    </div>
+                    <div class="progress-item" data-face="L" style="color: #FFA500;">
+                        <div class="progress-dot" style="color: #FFA500; border-color: #FFA500;">L</div>
+                        <span class="progress-label" style="color: #FFA500;">Esquerda</span>
+                    </div>
+                    <div class="progress-item" data-face="U" style="color: #FFFFFF;">
+                        <div class="progress-dot" style="color: #FFFFFF; border-color: #FFFFFF;">U</div>
+                        <span class="progress-label" style="color: #FFFFFF;">Topo</span>
+                    </div>
+                    <div class="progress-item" data-face="D" style="color: #FFFF00;">
+                        <div class="progress-dot" style="color: #FFFF00; border-color: #FFFF00;">D</div>
+                        <span class="progress-label" style="color: #FFFF00;">Base</span>
+                    </div>
                 </div>
                 
                 <div class="scan-grid-container">
@@ -407,8 +439,8 @@
                 </div>
                 
                 <div class="action-bar">
-                    <button class="action-btn" onclick="openManual()">✏️</button>
-                    <button class="action-btn" onclick="skipFace()" id="skip-btn">⏭</button>
+                    <button class="action-btn" onclick="openManual()" title="Ajustar manualmente">✏️</button>
+                    <button class="action-btn" onclick="skipFace()" id="skip-btn" title="Pular face">⏭</button>
                     <button class="action-btn primary" onclick="goToSolution()" id="solution-btn">Ver Solução →</button>
                 </div>
             </div>
@@ -416,18 +448,18 @@
             <div class="manual-modal" id="manual-modal">
                 <div style="text-align: center; margin-top: 30px;">
                     <h2 style="font-size: 18px;">Ajuste Manual</h2>
-                    <p style="color: rgba(255,255,255,0.5); font-size: 13px;">Selecione cor e toque nas células</p>
+                    <p style="color: rgba(255,255,255,0.5); font-size: 13px;">Toque na cor e depois na célula</p>
                 </div>
                 
                 <div class="manual-grid" id="manual-grid"></div>
                 
                 <div class="color-picker" id="color-picker">
-                    <div class="color-option selected" style="background: #FFFFFF;" data-color="U"></div>
-                    <div class="color-option" style="background: #FFD500;" data-color="D"></div>
-                    <div class="color-option" style="background: #FF0000;" data-color="R"></div>
-                    <div class="color-option" style="background: #FFA500;" data-color="L"></div>
-                    <div class="color-option" style="background: #00FF00;" data-color="F"></div>
-                    <div class="color-option" style="background: #0000FF;" data-color="B"></div>
+                    <div class="color-option selected" style="background: #FFFFFF;" data-color="U" title="Branco (Topo)"></div>
+                    <div class="color-option" style="background: #FFD500;" data-color="D" title="Amarelo (Base)"></div>
+                    <div class="color-option" style="background: #FF0000;" data-color="R" title="Vermelho (Direita)"></div>
+                    <div class="color-option" style="background: #FFA500;" data-color="L" title="Laranja (Esquerda)"></div>
+                    <div class="color-option" style="background: #00FF00;" data-color="F" title="Verde (Frente)"></div>
+                    <div class="color-option" style="background: #0000FF;" data-color="B" title="Azul (Trás)"></div>
                 </div>
                 
                 <div style="margin-top: auto; display: flex; gap: 12px; justify-content: center; padding-bottom: 30px;">
@@ -439,14 +471,16 @@
     </div>
 
     <script>
-        // === VARIÁVEIS GLOBAIS ===
+        // === CONFIGURAÇÃO ===
+        // Ordem otimizada: Frente → Direita → Trás → Esquerda → Topo → Base
+        // (minimiza giros, só gira o cubo no sentido horário no eixo Y, depois vira para cima/baixo)
         const SCAN_ORDER = [
-            { code: 'F', name: 'Frente', center: 'F' },
-            { code: 'R', name: 'Direita', center: 'R' },
-            { code: 'B', name: 'Trás', center: 'B' },
-            { code: 'L', name: 'Esquerda', center: 'L' },
-            { code: 'U', name: 'Topo', center: 'U' },
-            { code: 'D', name: 'Base', center: 'D' }
+            { code: 'F', name: 'Frente', fullName: 'FRENTE (Verde)', center: 'F', color: '#00FF00', textColor: '#00FF00' },
+            { code: 'R', name: 'Direita', fullName: 'DIREITA (Vermelho)', center: 'R', color: '#FF0000', textColor: '#FF0000' },
+            { code: 'B', name: 'Trás', fullName: 'TRÁS (Azul)', center: 'B', color: '#0000FF', textColor: '#4169E1' }, // Azul mais visível
+            { code: 'L', name: 'Esquerda', fullName: 'ESQUERDA (Laranja)', center: 'L', color: '#FFA500', textColor: '#FFA500' },
+            { code: 'U', name: 'Topo', fullName: 'TOPO (Branco)', center: 'U', color: '#FFFFFF', textColor: '#FFFFFF' },
+            { code: 'D', name: 'Base', fullName: 'BASE (Amarelo)', center: 'D', color: '#FFFF00', textColor: '#FFD700' }
         ];
         
         const COLOR_MAP = {
@@ -454,9 +488,19 @@
             'D': '#FFFF00', 'L': '#FFA500', 'B': '#0000FF'
         };
         
-        const COLOR_NAMES = { U: 'Branco', R: 'Vermelho', F: 'Verde', D: 'Amarelo', L: 'Laranja', B: 'Azul' };
-        const GRAY_COLOR = 0x444444;
+        const CENTER_COLORS = {
+            'U': 0xFFFFFF, 'R': 0xFF0000, 'F': 0x00FF00,
+            'D': 0xFFFF00, 'L': 0xFFA500, 'B': 0x0000FF
+        };
         
+        const COLOR_NAMES = { 
+            U: 'Branco', R: 'Vermelho', F: 'Verde', 
+            D: 'Amarelo', L: 'Laranja', B: 'Azul' 
+        };
+        
+        const GRAY_COLOR = 0x555555; // Cinza mais claro para melhor contraste
+        
+        // === ESTADO ===
         let currentStep = 0;
         let isScanning = false;
         let cubeState = {
@@ -468,19 +512,20 @@
             B: Array(9).fill(null)
         };
         
+        // Three.js
         let scene, camera, renderer, controls, cubeGroup;
-        let selectedColor = 'U';
+        let selectedColor = 'F'; // Começa com verde
         let lastColors = null;
         let stabilityStart = null;
-        
+
         // === INICIALIZAÇÃO ===
         window.onload = () => {
             init3D();
             updateUI();
             initManualGrid();
         };
-        
-        // === FUNÇÕES 3D ===
+
+        // === 3D COM CENTROS COLORIDOS ===
         function init3D() {
             const container = document.getElementById('cube-3d-container');
             
@@ -495,19 +540,26 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             container.appendChild(renderer.domElement);
             
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-            const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+            // Luzes melhoradas
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dir = new THREE.DirectionalLight(0xffffff, 0.9);
             dir.position.set(5, 10, 7);
             scene.add(dir);
             
-            const point = new THREE.PointLight(0x3b82f6, 0.3);
-            point.position.set(-5, -5, -5);
-            scene.add(point);
+            const point1 = new THREE.PointLight(0x3b82f6, 0.4);
+            point1.position.set(5, 5, 5);
+            scene.add(point1);
+            
+            const point2 = new THREE.PointLight(0xff6600, 0.3);
+            point2.position.set(-5, -5, -5);
+            scene.add(point2);
             
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.enableZoom = false;
+            controls.minDistance = 3;
+            controls.maxDistance = 8;
             
             buildCube();
             animate();
@@ -541,50 +593,82 @@
             
             scene.add(cubeGroup);
             
+            // Posiciona para mostrar face atual (ordem otimizada)
             const current = SCAN_ORDER[currentStep];
             if (current) {
-                const targetRot = { 
-                    F: { x: 0, y: 0 }, 
-                    R: { x: 0, y: -Math.PI/2 }, 
-                    B: { x: 0, y: Math.PI }, 
-                    L: { x: 0, y: Math.PI/2 }, 
-                    U: { x: -Math.PI/3, y: 0 }, 
-                    D: { x: Math.PI/3, y: 0 } 
-                }[current.code];
+                // Rotações otimizadas para a sequência F→R→B→L→U→D
+                const rotations = { 
+                    F: { x: 0, y: 0 },           // Frente (padrão)
+                    R: { x: 0, y: -Math.PI/2 },   // Direita (gira Y -90°)
+                    B: { x: 0, y: Math.PI },      // Trás (gira Y 180°)
+                    L: { x: 0, y: Math.PI/2 },    // Esquerda (gira Y +90°)
+                    U: { x: -Math.PI/2.5, y: 0 }, // Topo (gira X -72°)
+                    D: { x: Math.PI/2.5, y: 0 }   // Base (gira X +72°)
+                };
                 
-                cubeGroup.rotation.x = targetRot.x;
-                cubeGroup.rotation.y = targetRot.y;
+                const target = rotations[current.code];
+                
+                // Animação suave
+                const startX = cubeGroup.rotation.x;
+                const startY = cubeGroup.rotation.y;
+                const startTime = Date.now();
+                const duration = 400;
+                
+                function animateRot() {
+                    const elapsed = Date.now() - startTime;
+                    const t = Math.min(elapsed / duration, 1);
+                    const eased = 1 - Math.pow(1 - t, 3);
+                    
+                    cubeGroup.rotation.x = startX + (target.x - startX) * eased;
+                    cubeGroup.rotation.y = startY + (target.y - startY) * eased;
+                    
+                    if (t < 1) requestAnimationFrame(animateRot);
+                }
+                animateRot();
             }
         }
         
         function getMaterials(x, y, z) {
             const mats = [];
-            const faces = [
-                x === 1 ? 'R' : null,
-                x === -1 ? 'L' : null,
-                y === 1 ? 'U' : null,
-                y === -1 ? 'D' : null,
-                z === 1 ? 'F' : null,
-                z === -1 ? 'B' : null
+            
+            // Define qual face cada material representa
+            const faceMap = [
+                x === 1 ? 'R' : null,   // índice 0: Right
+                x === -1 ? 'L' : null,  // índice 1: Left
+                y === 1 ? 'U' : null,   // índice 2: Up
+                y === -1 ? 'D' : null,  // índice 3: Down
+                z === 1 ? 'F' : null,   // índice 4: Front
+                z === -1 ? 'B' : null   // índice 5: Back
             ];
             
-            faces.forEach(face => {
+            faceMap.forEach((face, materialIndex) => {
                 let color = GRAY_COLOR;
                 
                 if (face) {
                     const faceData = cubeState[face];
-                    const idx = getFaceIndex(x, y, z, face);
-                    const colorCode = faceData[idx];
+                    const stickerIndex = getFaceIndex(x, y, z, face);
+                    const detectedColor = faceData[stickerIndex];
                     
-                    if (colorCode && COLOR_MAP[colorCode]) {
-                        color = parseInt(COLOR_MAP[colorCode].replace('#', '0x'));
+                    // CENTRO (índice 4) sempre mostra cor correta como referência!
+                    if (stickerIndex === 4) {
+                        color = CENTER_COLORS[face];
+                    } 
+                    // Bordas: cinza se não detectado, cor real se detectado
+                    else if (detectedColor && COLOR_MAP[detectedColor]) {
+                        color = parseInt(COLOR_MAP[detectedColor].replace('#', '0x'));
                     }
+                    // else permanece GRAY_COLOR
                 }
+                
+                // Material com brilho diferente para centro
+                const isCenter = (face && getFaceIndex(x, y, z, face) === 4);
                 
                 mats.push(new THREE.MeshPhongMaterial({ 
                     color: color,
-                    shininess: 80,
-                    specular: 0x333333
+                    shininess: isCenter ? 120 : 80,
+                    specular: isCenter ? 0x666666 : 0x333333,
+                    emissive: isCenter ? color : 0x000000,
+                    emissiveIntensity: isCenter ? 0.15 : 0
                 }));
             });
             
@@ -592,13 +676,16 @@
         }
         
         function getFaceIndex(x, y, z, face) {
-            if (face === 'R') return (1-y)*3 + (z+1);
-            if (face === 'L') return (1-y)*3 + (1-z);
-            if (face === 'U') return (1-x)*3 + (z+1);
-            if (face === 'D') return (x+1)*3 + (z+1);
-            if (face === 'F') return (1-y)*3 + (x+1);
-            if (face === 'B') return (1-y)*3 + (1-x);
-            return 4;
+            // Converte coordenada 3D para índice 0-8 da face
+            switch(face) {
+                case 'R': return (1-y)*3 + (z+1);   // y: 1→0, 0→1, -1→2 | z: -1→0, 0→1, 1→2
+                case 'L': return (1-y)*3 + (1-z);   // y: 1→0, 0→1, -1→2 | z: 1→0, 0→1, -1→2 (espelhado)
+                case 'U': return (1-x)*3 + (z+1);   // x: 1→0, 0→1, -1→2 | z: -1→0, 0→1, 1→2
+                case 'D': return (x+1)*3 + (z+1);   // x: -1→0, 0→1, 1→2 | z: -1→0, 0→1, 1→2
+                case 'F': return (1-y)*3 + (x+1);   // y: 1→0, 0→1, -1→2 | x: -1→0, 0→1, 1→2
+                case 'B': return (1-y)*3 + (1-x);   // y: 1→0, 0→1, -1→2 | x: 1→0, 0→1, -1→2 (espelhado)
+                default: return 4;
+            }
         }
         
         function updateCube() {
@@ -610,8 +697,8 @@
             controls.update();
             renderer.render(scene, camera);
         }
-        
-        // === FUNÇÕES DA CÂMERA ===
+
+        // === CÂMERA E SCANNING ===
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -680,17 +767,18 @@
                 }
             }
             
+            // Validações
             const avgBrightness = brightnesses.reduce((a,b) => a+b, 0) / brightnesses.length;
             if (avgBrightness < 20) {
-                document.getElementById('status-text').textContent = '⚠️ Muito escuro';
+                document.getElementById('status-text').textContent = '⚠️ Muito escuro - aumente a luz';
                 document.getElementById('status-text').style.color = '#fbbf24';
                 resetStability();
                 updateScanGrid(colors, false);
                 return;
             }
             
-            const uniqueColors = [...new Set(colors)].filter(c => c !== 'X').length;
-            if (uniqueColors < 2) {
+            const validColors = colors.filter(c => c !== 'X');
+            if (validColors.length < 4) {
                 document.getElementById('status-text').textContent = '⚠️ Cubo não detectado';
                 document.getElementById('status-text').style.color = '#fbbf24';
                 resetStability();
@@ -701,16 +789,20 @@
             const current = SCAN_ORDER[currentStep];
             const centerColor = colors[4];
             
+            // Verifica se centro está correto
             if (centerColor === 'X' || centerColor !== current.center) {
-                const detectedName = centerColor === 'X' ? 'desconhecida' : COLOR_NAMES[centerColor];
-                document.getElementById('status-text').textContent = `Centro ${detectedName}, precisa ser ${current.name}`;
+                const detectedName = centerColor === 'X' ? 'indeterminada' : COLOR_NAMES[centerColor];
+                document.getElementById('status-text').innerHTML = 
+                    `Centro <span style="color:${COLOR_MAP[centerColor]||'#fff'}">${detectedName}</span> - precisa ser <span style="color:${current.color}">${current.name}</span>`;
                 document.getElementById('status-text').style.color = '#ef4444';
                 resetStability();
                 updateScanGrid(colors, false);
                 return;
             }
             
-            document.getElementById('status-text').textContent = 'Mantenha estável...';
+            // Centro correto!
+            document.getElementById('status-text').innerHTML = 
+                `✓ Centro <span style="color:${current.color}">${current.name}</span> detectado! Mantenha estável...`;
             document.getElementById('status-text').style.color = '#22c55e';
             
             checkStability(colors);
@@ -736,26 +828,29 @@
         }
         
         function onStableDetection(colors) {
-            // Evita múltiplas capturas
             if (!isScanning) return;
             
+            // Feedback visual
             document.querySelectorAll('.scan-cell').forEach(cell => {
                 cell.classList.add('stable');
                 setTimeout(() => cell.classList.remove('stable'), 400);
             });
             
+            // Salva dados
             const current = SCAN_ORDER[currentStep];
             cubeState[current.code] = [...colors];
             
+            // Feedback tátil
             if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
             
+            // Atualiza cubo 3D
             updateCube();
             
-            // Pausa brevemente o scanning para evitar duplicatas
+            // Pausa e avança
             isScanning = false;
             setTimeout(() => {
                 nextFace();
-                if (currentStep < 6) {
+                if (currentStep < 6 && !isCubeComplete()) {
                     isScanning = true;
                     scanLoop();
                 }
@@ -766,22 +861,27 @@
             currentStep++;
             resetStability();
             
-            // Verifica se TODAS as faces estão preenchidas
-            const allFacesComplete = Object.values(cubeState).every(face => 
-                face.every(color => color !== null)
-            );
-            
-            if (allFacesComplete) {
+            if (isCubeComplete()) {
                 finishCapture();
             } else if (currentStep >= 6) {
-                // Se percorreu todas mas não completou, volta ao início
+                // Volta ao início se faltam faces
                 currentStep = 0;
                 updateUI();
-                document.getElementById('status-text').textContent = '⚠️ Faces faltando. Recomeçando...';
+                document.getElementById('status-text').textContent = '⚠️ Faltam faces! Recomeçando...';
                 document.getElementById('status-text').style.color = '#fbbf24';
+                setTimeout(() => {
+                    document.getElementById('status-text').textContent = 'Centralize o cubo na grade';
+                    document.getElementById('status-text').style.color = 'white';
+                }, 2000);
             } else {
                 updateUI();
             }
+        }
+        
+        function isCubeComplete() {
+            return Object.values(cubeState).every(face => 
+                face.every(color => color !== null && color !== undefined)
+            );
         }
         
         function skipFace() {
@@ -793,42 +893,49 @@
         
         function finishCapture() {
             isScanning = false;
-            document.getElementById('status-text').textContent = '✓ Cubo completo! (' + countFilledFaces() + '/6 faces)';
+            const completed = Object.values(cubeState).filter(f => f.every(c => c !== null)).length;
+            document.getElementById('status-text').innerHTML = 
+                `✓ <b>Cubo completo!</b> ${completed}/6 faces`;
             document.getElementById('status-text').style.color = '#22c55e';
             document.getElementById('skip-btn').style.display = 'none';
             document.getElementById('solution-btn').style.display = 'block';
             localStorage.setItem('rubikState', JSON.stringify(cubeState));
         }
         
-        function countFilledFaces() {
-            return Object.values(cubeState).filter(face => 
-                face.every(color => color !== null)
-            ).length;
-        }
-        
         function goToSolution() {
-            // Verificação final antes de ir
-            const complete = Object.values(cubeState).every(face => 
-                face.every(color => color !== null)
-            );
-            
-            if (!complete) {
-                alert('Cubo incompleto! Faltam faces.');
+            if (!isCubeComplete()) {
+                alert('Cubo incompleto! Escaneie todas as 6 faces.');
                 return;
             }
-            
             window.location.href = 'solution.html';
         }
-        
+
+        // === UI ===
         function updateUI() {
             const current = SCAN_ORDER[currentStep];
-            document.getElementById('header-title').textContent = `Mostre a face ${current.name.toUpperCase()}`;
+            
+            // Título com cor
+            document.getElementById('header-title').innerHTML = 
+                `Mostre <span style="color:${current.textColor}">${current.fullName}</span>`;
             document.getElementById('face-counter').textContent = `${currentStep + 1}/6`;
             
-            document.querySelectorAll('.progress-dot').forEach((dot, idx) => {
-                dot.classList.remove('active', 'done');
-                if (idx < currentStep) dot.classList.add('done');
-                else if (idx === currentStep) dot.classList.add('active');
+            // Progresso visual
+            document.querySelectorAll('.progress-item').forEach((item, idx) => {
+                item.classList.remove('active', 'done');
+                const dot = item.querySelector('.progress-dot');
+                
+                if (idx < currentStep) {
+                    item.classList.add('done');
+                    dot.style.background = 'rgba(34,197,94,0.3)';
+                    dot.style.borderColor = '#22c55e';
+                    dot.textContent = '✓';
+                } else if (idx === currentStep) {
+                    item.classList.add('active');
+                    dot.textContent = current.code;
+                } else {
+                    dot.textContent = SCAN_ORDER[idx].code;
+                    dot.style.background = 'rgba(255,255,255,0.05)';
+                }
             });
         }
         
@@ -837,8 +944,8 @@
                 const cell = document.getElementById(`scan-${i}`);
                 if (code !== 'X' && COLOR_MAP[code]) {
                     cell.style.backgroundColor = COLOR_MAP[code];
-                    cell.style.opacity = '0.85';
-                    cell.style.boxShadow = `inset 0 0 15px ${COLOR_MAP[code]}40`;
+                    cell.style.opacity = '0.9';
+                    cell.style.boxShadow = `inset 0 0 20px ${COLOR_MAP[code]}60, 0 0 10px ${COLOR_MAP[code]}40`;
                 } else {
                     cell.style.backgroundColor = 'transparent';
                     cell.style.opacity = '1';
@@ -857,7 +964,7 @@
         function colorsEqual(a, b) {
             return a.every((v, i) => v === b[i]);
         }
-        
+
         // === MANUAL ===
         function initManualGrid() {
             const grid = document.getElementById('manual-grid');
@@ -891,6 +998,12 @@
                 cell.dataset.color = color;
             });
             
+            // Seleciona cor do centro como padrão
+            selectedColor = current.center;
+            document.querySelectorAll('.color-option').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.color === selectedColor);
+            });
+            
             document.getElementById('manual-modal').style.display = 'flex';
         }
         
@@ -910,7 +1023,8 @@
             closeManual();
             nextFace();
         }
-        
+
+        // === UTILS ===
         function getPixel(ctx, x, y) {
             const d = ctx.getImageData(Math.max(0, x-4), Math.max(0, y-4), 8, 8).data;
             let r=0, g=0, b=0, n=0;
@@ -923,16 +1037,16 @@
         function rgbToCode(r, g, b) {
             const [h, s, v] = rgbToHsv(r, g, b);
             
-            if (v < 0.1) return 'X';
-            if (v > 0.75 && s < 0.2) return 'U';
-            if (v > 0.4 && s > 0.25) {
-                if (h >= 45 && h < 85) return 'D';
-                if (h >= 10 && h < 45) return 'L';
-                if ((h >= 330 || h < 20) && s > 0.4) return 'R';
-                if (h >= 75 && h < 165) return 'F';
-                if (h >= 190 && h < 275) return 'B';
+            if (v < 0.12) return 'X';
+            if (v > 0.78 && s < 0.22) return 'U'; // Branco
+            if (v > 0.45 && s > 0.28) {
+                if (h >= 48 && h < 82) return 'D';   // Amarelo
+                if (h >= 12 && h < 42) return 'L';   // Laranja
+                if ((h >= 335 || h < 18) && s > 0.45) return 'R'; // Vermelho
+                if (h >= 78 && h < 155) return 'F';  // Verde
+                if (h >= 195 && h < 265) return 'B'; // Azul
             }
-            return v > 0.55 ? 'U' : 'F';
+            return v > 0.6 ? 'U' : 'F';
         }
         
         function rgbToHsv(r, g, b) {
