@@ -47,7 +47,6 @@
             color: rgba(255,255,255,0.6);
         }
         
-        /* Container principal */
         .main-container {
             position: fixed;
             top: calc(env(safe-area-inset-top) + 50px);
@@ -57,7 +56,6 @@
             flex-direction: column;
         }
         
-        /* Área da câmera com cubo 3D overlay */
         .camera-area {
             position: relative;
             flex: 1;
@@ -102,14 +100,13 @@
             50% { transform: scale(1.05); box-shadow: 0 12px 40px rgba(34,197,94,0.7); }
         }
         
-        /* Grade de scan centralizada */
         .scan-overlay {
             position: absolute;
             inset: 0;
             display: none;
-            pointer-events: none;
         }
         
+        /* Grade mais transparente */
         .scan-grid {
             position: absolute;
             top: 45%;
@@ -119,26 +116,26 @@
             height: min(240px, 60vw);
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 4px;
-            padding: 6px;
-            background: rgba(0,0,0,0.4);
+            gap: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2); /* Mais transparente */
             border-radius: 16px;
-            border: 2px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.15); /* Borda mais sutil */
+            pointer-events: none;
         }
         
         .scan-cell {
             border-radius: 10px;
-            border: 2px solid rgba(255,255,255,0.6);
-            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.25); /* Borda mais fina */
+            background: rgba(255,255,255,0.03); /* Quase invisível quando sem cor */
             transition: all 0.3s;
             position: relative;
             overflow: hidden;
         }
         
         .scan-cell.detected {
-            border-color: #22c55e;
-            background: rgba(34,197,94,0.2);
-            box-shadow: 0 0 20px rgba(34,197,94,0.4);
+            border-color: rgba(34,197,94,0.6);
+            background: rgba(34,197,94,0.1);
         }
         
         .scan-cell.stable {
@@ -147,22 +144,21 @@
         
         @keyframes stable-flash {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(0.95); background: rgba(34,197,94,0.5); }
+            50% { transform: scale(0.95); background: rgba(34,197,94,0.4); }
         }
         
-        /* Cubo 3D preview no canto */
+        /* Cubo 3D preview - estático */
         .cube-preview-3d {
             position: absolute;
             bottom: 20px;
             right: 20px;
             width: 120px;
             height: 120px;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.5);
             border-radius: 16px;
-            border: 2px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.15);
             z-index: 20;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }
         
         #cube-3d-mini {
@@ -170,7 +166,6 @@
             height: 100%;
         }
         
-        /* Indicador de progresso lateral */
         .progress-sidebar {
             position: absolute;
             left: 16px;
@@ -223,7 +218,6 @@
             text-transform: uppercase;
         }
         
-        /* Status e timer */
         .status-bar {
             position: absolute;
             top: 20px;
@@ -256,7 +250,6 @@
             transition: width 0.1s linear;
         }
         
-        /* Botões de ação */
         .action-buttons {
             position: absolute;
             bottom: 20px;
@@ -301,40 +294,10 @@
             50% { box-shadow: 0 0 0 10px rgba(34,197,94,0); }
         }
         
-        /* Tela de confirmação (apenas se necessário) */
-        .confirm-screen {
-            position: absolute;
-            inset: 0;
-            background: rgba(0,0,0,0.95);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-            z-index: 50;
-            padding: 20px;
-        }
-        
-        .confirm-grid {
-            width: 200px;
-            height: 200px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 4px;
-            padding: 8px;
-            background: #2a2a2a;
-            border-radius: 12px;
-        }
-        
-        .confirm-cell {
-            border-radius: 8px;
-        }
-        
-        /* Manual override modal */
         .manual-modal {
             position: absolute;
             inset: 0;
-            background: rgba(0,0,0,0.95);
+            background: rgba(0,0,0,0.98);
             display: none;
             flex-direction: column;
             z-index: 60;
@@ -440,7 +403,7 @@
                     </div>
                 </div>
                 
-                <!-- Grade de scan -->
+                <!-- Grade de scan transparente -->
                 <div class="scan-grid" id="scan-grid">
                     <div class="scan-cell" id="scan-0"></div>
                     <div class="scan-cell" id="scan-1"></div>
@@ -453,7 +416,7 @@
                     <div class="scan-cell" id="scan-8"></div>
                 </div>
                 
-                <!-- Cubo 3D preview -->
+                <!-- Cubo 3D preview - ESTÁTICO -->
                 <div class="cube-preview-3d">
                     <div id="cube-3d-mini"></div>
                 </div>
@@ -466,16 +429,14 @@
                 </div>
             </div>
             
-            <!-- Tela de confirmação manual -->
+            <!-- Modal manual -->
             <div class="manual-modal" id="manual-modal">
                 <div style="text-align: center; margin-top: 40px;">
                     <h2 style="font-size: 20px; margin-bottom: 8px;">Ajuste Manual</h2>
-                    <p style="color: rgba(255,255,255,0.6); font-size: 14px;">Toque nas cores abaixo e depois nas células</p>
+                    <p style="color: rgba(255,255,255,0.6); font-size: 14px;">Selecione a cor e toque nas células</p>
                 </div>
                 
-                <div class="manual-grid" id="manual-grid">
-                    <!-- Gerado via JS -->
-                </div>
+                <div class="manual-grid" id="manual-grid"></div>
                 
                 <div class="color-picker" id="color-picker">
                     <div class="color-option selected" style="background: #FFFFFF;" data-color="U" data-hex="#FFFFFF"></div>
@@ -491,13 +452,10 @@
                     <button onclick="saveManual()" style="padding: 12px 24px; border-radius: 20px; border: none; background: #22c55e; color: white; font-weight: 600;">Salvar Face</button>
                 </div>
             </div>
-            
-            <input type="file" id="file-input" accept="image/*" capture="environment" onchange="handleFile(event)">
         </div>
     </div>
 
     <script>
-        // Ordem de scan: F → R → B → L → U → D
         const SCAN_ORDER = [
             { code: 'F', name: 'Frente', color: '#00FF00', center: 'F' },
             { code: 'R', name: 'Direita', color: '#FF0000', center: 'R' },
@@ -524,10 +482,10 @@
         // Sistema de estabilidade
         let lastColors = null;
         let stabilityStart = null;
-        const STABILITY_TIME = 1500; // 1.5 segundos
+        const STABILITY_TIME = 1500;
         let isStable = false;
         
-        // Three.js para preview
+        // Three.js - APENAS para preview estático
         let miniScene, miniCamera, miniRenderer, miniCube;
         let selectedColor = 'U';
         
@@ -558,7 +516,7 @@
             miniScene.add(dir);
             
             buildMiniCube();
-            animateMini();
+            renderMini(); // Renderiza uma vez, sem animação
         }
         
         function buildMiniCube() {
@@ -570,7 +528,7 @@
             
             // Atualiza com cores já capturadas
             Object.keys(cubeState).forEach(face => {
-                if (cubeState[face][4]) { // Se centro está preenchido
+                if (cubeState[face][4]) {
                     colors[face] = parseInt(COLOR_MAP[face].replace('#', '0x'));
                 }
             });
@@ -604,19 +562,24 @@
             
             miniScene.add(miniCube);
             
-            // Rotação para mostrar face atual
+            // Posiciona estático para mostrar face atual
             if (current) {
-                const rot = { F: [0,0], R: [0, -Math.PI/2], B: [0, Math.PI], L: [0, Math.PI/2], U: [-Math.PI/2, 0], D: [Math.PI/2, 0] }[current.code];
+                const rot = { 
+                    F: [0, 0], 
+                    R: [0, -Math.PI/2], 
+                    B: [0, Math.PI], 
+                    L: [0, Math.PI/2], 
+                    U: [-Math.PI/2.5, 0], 
+                    D: [Math.PI/2.5, 0] 
+                }[current.code];
                 miniCube.rotation.x = rot[0];
                 miniCube.rotation.y = rot[1];
             }
+            
+            renderMini();
         }
         
-        function animateMini() {
-            requestAnimationFrame(animateMini);
-            if (miniCube) {
-                miniCube.rotation.y += 0.005;
-            }
+        function renderMini() {
             miniRenderer.render(miniScene, miniCamera);
         }
         
@@ -638,8 +601,7 @@
                 scanLoop();
                 
             } catch (e) {
-                // Fallback para input de arquivo
-                document.getElementById('file-input').click();
+                alert('Erro ao acessar câmera: ' + e.message);
             }
         }
         
@@ -666,21 +628,43 @@
             const cellSize = size / 3;
             
             const colors = [];
+            const brightnesses = []; // Para validar iluminação
+            
             for (let r = 0; r < 3; r++) {
                 for (let c = 0; c < 3; c++) {
                     const x = cx - size/2 + c * cellSize + cellSize/2;
                     const y = cy - size/2 + r * cellSize + cellSize/2;
                     const p = getPixel(ctx, x, y);
                     colors.push(rgbToCode(p.r, p.g, p.b));
+                    brightnesses.push((p.r + p.g + p.b) / 3);
                 }
             }
             
-            // Verifica se centro está correto
+            // VALIDAÇÃO: Verifica se imagem não está escura/tampada
+            const avgBrightness = brightnesses.reduce((a,b) => a+b) / brightnesses.length;
+            if (avgBrightness < 30) { // Muito escuro
+                document.getElementById('status-text').textContent = '⚠️ Iluminação insuficiente';
+                document.getElementById('status-text').style.color = '#fbbf24';
+                resetStability();
+                updateScanGrid(colors, false);
+                return;
+            }
+            
+            // VALIDAÇÃO: Verifica variação de cores (evita imagem uniforme/escura)
+            const uniqueColors = [...new Set(colors)].length;
+            if (uniqueColors < 2) { // Quase todas as células com a mesma cor
+                document.getElementById('status-text').textContent = '⚠️ Cubo não detectado';
+                document.getElementById('status-text').style.color = '#fbbf24';
+                resetStability();
+                updateScanGrid(colors, false);
+                return;
+            }
+            
+            // Verifica centro
             const current = SCAN_ORDER[currentStep];
             const centerColor = colors[4];
             const isCorrectCenter = (centerColor === current.center);
             
-            // Atualiza visual da grade
             updateScanGrid(colors, isCorrectCenter);
             
             if (!isCorrectCenter) {
@@ -693,7 +677,6 @@
             document.getElementById('status-text').textContent = 'Perfeito! Mantenha estável...';
             document.getElementById('status-text').style.color = '#22c55e';
             
-            // Sistema de estabilidade
             checkStability(colors);
         }
         
@@ -719,23 +702,18 @@
         }
         
         function onStableDetection(colors) {
-            // Flash visual
             document.querySelectorAll('.scan-cell').forEach(cell => {
                 cell.classList.add('stable');
                 setTimeout(() => cell.classList.remove('stable'), 500);
             });
             
-            // Salva automaticamente
             const current = SCAN_ORDER[currentStep];
             cubeState[current.code] = [...colors];
             
-            // Feedback tátil
             if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
             
-            // Atualiza cubo 3D
-            buildMiniCube();
+            buildMiniCube(); // Atualiza preview estático
             
-            // Próxima face após delay
             setTimeout(() => {
                 nextFace();
             }, 600);
@@ -749,7 +727,7 @@
                 finishCapture();
             } else {
                 updateUI();
-                buildMiniCube();
+                buildMiniCube(); // Atualiza rotação do cubo 3D estático
             }
         }
         
@@ -788,9 +766,17 @@
         function updateScanGrid(colors, isValid) {
             colors.forEach((code, i) => {
                 const cell = document.getElementById(`scan-${i}`);
-                const color = COLOR_MAP[code] || '#334155';
-                cell.style.backgroundColor = color;
-                cell.style.opacity = '0.9';
+                const color = COLOR_MAP[code] || null;
+                
+                if (color) {
+                    cell.style.backgroundColor = color;
+                    cell.style.opacity = '0.85';
+                    cell.style.boxShadow = `0 0 10px ${color}40`;
+                } else {
+                    cell.style.backgroundColor = 'transparent';
+                    cell.style.opacity = '1';
+                    cell.style.boxShadow = 'none';
+                }
                 
                 if (isValid) {
                     cell.classList.add('detected');
@@ -872,34 +858,6 @@
             nextFace();
         }
         
-        function handleFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                document.getElementById('camera-placeholder').style.display = 'none';
-                document.getElementById('scan-overlay').style.display = 'block';
-                
-                isScanning = true;
-                resetStability();
-                
-                const process = () => {
-                    if (!isScanning || currentStep >= 6) return;
-                    analyzeFrame(ctx, canvas.width, canvas.height);
-                    requestAnimationFrame(process);
-                };
-                process();
-            };
-            img.src = URL.createObjectURL(file);
-        }
-        
         function getPixel(ctx, x, y) {
             const d = ctx.getImageData(Math.max(0, x-5), Math.max(0, y-5), 10, 10).data;
             let r=0, g=0, b=0, n=0;
@@ -915,17 +873,19 @@
         function rgbToCode(r, g, b) {
             const [h, s, v] = rgbToHsv(r, g, b);
             
-            if (v > 0.8 && s < 0.25) return 'U'; // Branco
-            if (v > 0.6 && s > 0.4) {
-                if (h >= 50 && h < 80) return 'D'; // Amarelo
-                if (h >= 15 && h < 45) return 'L'; // Laranja
-                if ((h >= 340 || h < 15) && s > 0.5) return 'R'; // Vermelho
-                if (h >= 80 && h < 160) return 'F'; // Verde
-                if (h >= 200 && h < 270) return 'B'; // Azul
+            // Rejeita preto/cinza escuro
+            if (v < 0.15) return 'X'; // Código para "desconhecido/escuro"
+            
+            if (v > 0.75 && s < 0.25) return 'U';
+            if (v > 0.5 && s > 0.3) {
+                if (h >= 50 && h < 80) return 'D';
+                if (h >= 15 && h < 45) return 'L';
+                if ((h >= 340 || h < 15) && s > 0.5) return 'R';
+                if (h >= 80 && h < 160) return 'F';
+                if (h >= 200 && h < 270) return 'B';
             }
             
-            // Fallback baseado em luminosidade
-            if (v > 0.7) return 'U';
+            if (v > 0.6) return 'U';
             return 'F';
         }
         
