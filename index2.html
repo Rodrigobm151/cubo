@@ -1,1210 +1,516 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>Cube Scanner Pro - Solver 3x3</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
-            min-height: 100vh;
-            overflow-x: hidden;
-            touch-action: manipulation;
-        }
+<title>Rubik Scanner</title>
 
-        .container {
-            max-width: 100%;
-            padding: 10px;
-            padding-bottom: 100px;
-        }
+<style>
 
-        header {
-            text-align: center;
-            padding: 15px;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
+body{
+    margin:0;
+    background:#000;
+    color:#fff;
+    font-family:Arial, Helvetica, sans-serif;
+    overflow:hidden;
+}
 
-        h1 {
-            font-size: 1.4rem;
-            background: linear-gradient(45deg, #00f2ff, #ff00e4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 5px;
-        }
+#app{
+    position:relative;
+    width:100vw;
+    height:100vh;
+}
 
-        .subtitle {
-            font-size: 0.8rem;
-            opacity: 0.8;
-            color: #aaa;
-        }
+/* CÂMERA */
+video, canvas{
+    position:absolute;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
 
-        /* Scanner Section */
-        .scanner-section {
-            background: rgba(255,255,255,0.05);
-            border-radius: 20px;
-            padding: 15px;
-            margin: 15px 0;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+/* INSTRUÇÕES */
+#info{
+    position:absolute;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:rgba(0,0,0,.7);
+    padding:15px 25px;
+    border-radius:20px;
+    text-align:center;
+    font-size:16px;
+}
 
-        .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            margin: 0 auto;
-            border-radius: 15px;
-            overflow: hidden;
-            background: #000;
-            aspect-ratio: 1;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
+/* PREVIEW 3x3 */
+#preview{
+    position:absolute;
+    top:15px;
+    left:15px;
+    display:grid;
+    grid-template-columns:repeat(3,28px);
+    gap:4px;
+}
 
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1); /* Mirror effect */
-        }
+.cell{
+    width:28px;
+    height:28px;
+    border-radius:6px;
+    border:1px solid #555;
+}
 
-        #canvas {
-            display: none;
-        }
-
-        .overlay-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .scan-grid {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 70%;
-            height: 70%;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 2px;
-            border: 3px solid rgba(255,255,255,0.8);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 0 20px rgba(0,242,255,0.3);
-        }
-
-        .scan-cell {
-            border: 1px solid rgba(255,255,255,0.3);
-            background: rgba(255,255,255,0.05);
-            position: relative;
-        }
-
-        .scan-cell.active {
-            background: rgba(0,242,255,0.2);
-            border-color: #00f2ff;
-        }
-
-        .scan-point {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: rgba(255,255,255,0.9);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 25px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(45deg, #00f2ff, #0099ff);
-            color: #000;
-            box-shadow: 0 4px 15px rgba(0,242,255,0.4);
-        }
-
-        .btn-secondary {
-            background: rgba(255,255,255,0.1);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .btn-success {
-            background: linear-gradient(45deg, #00ff88, #00cc66);
-            color: #000;
-            box-shadow: 0 4px 15px rgba(0,255,136,0.4);
-        }
-
-        .btn:active {
-            transform: scale(0.95);
-        }
-
-        /* Face Selector */
-        .face-selector {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-
-        .face-btn {
-            width: 45px;
-            height: 45px;
-            border: 3px solid transparent;
-            border-radius: 10px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 0.8rem;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .face-btn.white { background: #f0f0f0; color: #333; }
-        .face-btn.red { background: #ff4444; color: #fff; }
-        .face-btn.green { background: #44ff44; color: #000; }
-        .face-btn.orange { background: #ff8844; color: #000; }
-        .face-btn.blue { background: #4444ff; color: #fff; }
-        .face-btn.yellow { background: #ffff44; color: #000; }
-
-        .face-btn.completed::after {
-            content: '✓';
-            position: absolute;
-            top: 2px;
-            right: 2px;
-            font-size: 0.7rem;
-            background: rgba(0,0,0,0.7);
-            color: #0f0;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .face-btn.active {
-            border-color: #00f2ff;
-            transform: scale(1.1);
-            box-shadow: 0 0 20px rgba(0,242,255,0.5);
-        }
-
-        /* Cube Preview */
-        .cube-preview {
-            background: rgba(255,255,255,0.05);
-            border-radius: 20px;
-            padding: 20px;
-            margin: 15px 0;
-            text-align: center;
-        }
-
-        .preview-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 4px;
-            width: 150px;
-            margin: 0 auto;
-            background: rgba(0,0,0,0.3);
-            padding: 10px;
-            border-radius: 10px;
-        }
-
-        .preview-cell {
-            aspect-ratio: 1;
-            border-radius: 4px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .preview-cell:hover {
-            transform: scale(1.1);
-            z-index: 10;
-            box-shadow: 0 0 10px rgba(255,255,255,0.3);
-        }
-
-        /* Color Calibration */
-        .calibration-panel {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 15px;
-            margin: 15px 0;
-            display: none;
-        }
-
-        .calibration-panel.active {
-            display: block;
-        }
-
-        .calibration-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .calib-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 10px;
-        }
-
-        .color-sample {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.3);
-        }
-
-        .tolerance-slider {
-            width: 100%;
-            margin-top: 5px;
-        }
-
-        /* Manual Input Fallback */
-        .manual-input {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            max-width: 250px;
-            margin: 15px auto;
-        }
-
-        .color-picker {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-
-        .color-option {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 3px solid transparent;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-        }
-
-        .color-option.selected {
-            border-color: #fff;
-            transform: scale(1.2);
-            box-shadow: 0 0 15px currentColor;
-        }
-
-        /* Settings Panel */
-        .settings-panel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(20,20,30,0.98);
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 20px 20px 0 0;
-            transform: translateY(100%);
-            transition: transform 0.3s;
-            z-index: 200;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-
-        .settings-panel.open {
-            transform: translateY(0);
-        }
-
-        .settings-toggle {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #ff00e4, #ff0066);
-            border: none;
-            color: #fff;
-            font-size: 1.5rem;
-            cursor: pointer;
-            z-index: 201;
-            box-shadow: 0 4px 15px rgba(255,0,228,0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* Tips */
-        .tips {
-            background: rgba(0,242,255,0.1);
-            border-left: 4px solid #00f2ff;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 0 10px 10px 0;
-            font-size: 0.9rem;
-        }
-
-        .tips h3 {
-            margin-bottom: 8px;
-            color: #00f2ff;
-        }
-
-        .tips ul {
-            margin-left: 20px;
-            opacity: 0.9;
-        }
-
-        .tips li {
-            margin: 5px 0;
-        }
-
-        /* Loading */
-        .loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            z-index: 1000;
-        }
-
-        .loading.active {
-            display: flex;
-        }
-
-        .spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(255,255,255,0.1);
-            border-top-color: #00f2ff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .progress-bar {
-            width: 200px;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
-            margin-top: 20px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00f2ff, #ff00e4);
-            width: 0%;
-            transition: width 0.3s;
-        }
-
-        /* Detection Preview */
-        .detection-preview {
-            display: flex;
-            gap: 5px;
-            justify-content: center;
-            margin-top: 10px;
-            flex-wrap: wrap;
-        }
-
-        .detected-color {
-            width: 30px;
-            height: 30px;
-            border-radius: 5px;
-            border: 2px solid rgba(255,255,255,0.3);
-            position: relative;
-            animation: popIn 0.3s ease;
-        }
-
-        @keyframes popIn {
-            from { transform: scale(0); }
-            to { transform: scale(1); }
-        }
-
-        .confidence-bar {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: rgba(0,0,0,0.5);
-        }
-
-        .confidence-fill {
-            height: 100%;
-            background: #0f0;
-        }
-
-        /* Responsive */
-        @media (max-width: 380px) {
-            .face-btn {
-                width: 40px;
-                height: 40px;
-                font-size: 0.7rem;
-            }
-            
-            .btn {
-                padding: 10px 18px;
-                font-size: 0.8rem;
-            }
-        }
-
-        /* Flash effect */
-        .flash {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: white;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.1s;
-        }
-
-        .flash.active {
-            opacity: 0.8;
-        }
-    </style>
+</style>
 </head>
+
 <body>
-    <div class="container">
-        <header>
-            <h1>🎲 Cube Scanner Pro</h1>
-            <div class="subtitle">Escaneamento Inteligente 3x3</div>
-        </header>
 
-        <div class="tips">
-            <h3>💡 Dicas para Escaneamento Perfeito</h3>
-            <ul>
-                <li>Use luz natural ou iluminação uniforme</li>
-                <li>Evite reflexos e sombras no cubo</li>
-                <li>Mantenha o cubo centralizado na grade</li>
-                <li>Escaneie uma face por vez, começando pelo centro</li>
-            </ul>
-        </div>
+<div id="app">
 
-        <div class="scanner-section">
-            <div class="face-selector">
-                <div class="face-btn white active" data-face="U" data-color="white">UP</div>
-                <div class="face-btn red" data-face="R" data-color="red">RIGHT</div>
-                <div class="face-btn green" data-face="F" data-color="green">FRONT</div>
-                <div class="face-btn orange" data-face="L" data-color="orange">LEFT</div>
-                <div class="face-btn blue" data-face="B" data-color="blue">BACK</div>
-                <div class="face-btn yellow" data-face="D" data-color="yellow">DOWN</div>
-            </div>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
 
-            <div class="camera-container">
-                <video id="video" autoplay playsinline></video>
-                <canvas id="canvas"></canvas>
-                <canvas class="overlay-canvas" id="overlay"></canvas>
-                <div class="scan-grid" id="scanGrid">
-                    <div class="scan-cell" data-pos="0"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="1"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="2"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="3"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="4"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="5"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="6"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="7"><div class="scan-point"></div></div>
-                    <div class="scan-cell" data-pos="8"><div class="scan-point"></div></div>
-                </div>
-                <div class="flash" id="flash"></div>
-            </div>
+    <div id="preview"></div>
 
-            <div class="detection-preview" id="detectionPreview"></div>
+    <div id="info"></div>
 
-            <div class="controls">
-                <button class="btn btn-primary" id="btnScan">
-                    <span>📷</span> Capturar
-                </button>
-                <button class="btn btn-secondary" id="btnAuto">
-                    <span>🔄</span> Auto-Scan
-                </button>
-                <button class="btn btn-success" id="btnSolve" disabled>
-                    <span>✨</span> Resolver
-                </button>
-            </div>
+</div>
 
-            <div class="controls">
-                <button class="btn btn-secondary" id="btnToggleManual">
-                    <span>✏️</span> Editar Manual
-                </button>
-                <button class="btn btn-secondary" id="btnCalibrate">
-                    <span>⚙️</span> Calibrar Cores
-                </button>
-                <button class="btn btn-secondary" id="btnReset">
-                    <span>🗑️</span> Limpar
-                </button>
-            </div>
-        </div>
 
-        <div class="cube-preview">
-            <h3>Preview: <span id="currentFaceName">White (Up)</span></h3>
-            <div class="preview-grid" id="previewGrid">
-                <!-- Generated by JS -->
-            </div>
-            <div class="color-picker" id="colorPicker" style="display: none;">
-                <div class="color-option selected" style="background: #ffffff" data-color="white"></div>
-                <div class="color-option" style="background: #ff4444" data-color="red"></div>
-                <div class="color-option" style="background: #44ff44" data-color="green"></div>
-                <div class="color-option" style="background: #ff8844" data-color="orange"></div>
-                <div class="color-option" style="background: #4444ff" data-color="blue"></div>
-                <div class="color-option" style="background: #ffff44" data-color="yellow"></div>
-            </div>
-        </div>
+<script>
 
-        <div class="calibration-panel" id="calibrationPanel">
-            <h3>🎨 Calibração de Cores</h3>
-            <p style="font-size: 0.9rem; margin-bottom: 10px;">Ajuste a tolerância para cada cor:</p>
-            <div class="calibration-grid" id="calibrationGrid">
-                <!-- Generated by JS -->
-            </div>
-            <div class="controls" style="margin-top: 15px;">
-                <button class="btn btn-primary" id="btnSaveCalib">Salvar</button>
-                <button class="btn btn-secondary" id="btnResetCalib">Resetar</button>
-            </div>
-        </div>
-    </div>
+////////////////////////////////////////////////////
+// CONFIG
+////////////////////////////////////////////////////
 
-    <button class="settings-toggle" id="btnSettings">⚙️</button>
-    
-    <div class="settings-panel" id="settingsPanel">
-        <h3>Configurações Avançadas</h3>
-        <div style="margin: 20px 0;">
-            <label style="display: block; margin-bottom: 10px;">
-                <input type="checkbox" id="chkAdvancedMode"> Modo Avançado (HSV)
-            </label>
-            <label style="display: block; margin-bottom: 10px;">
-                <input type="checkbox" id="chkAutoWhiteBalance"> Balance de Branco Auto
-            </label>
-            <label style="display: block; margin-bottom: 10px;">
-                Brilho: <input type="range" id="rangeBrightness" min="0.5" max="2" step="0.1" value="1">
-            </label>
-            <label style="display: block; margin-bottom: 10px;">
-                Saturação: <input type="range" id="rangeSaturation" min="0.5" max="2" step="0.1" value="1">
-            </label>
-        </div>
-        <button class="btn btn-secondary" id="btnCloseSettings" style="width: 100%;">Fechar</button>
-    </div>
+// Ordem oficial URFDLB
+const ORDER = [
+ {key:"U", name:"Topo", color:"white", label:"Branco", hint:"Coloque o branco para cima"},
+ {key:"R", name:"Direita", color:"red", label:"Vermelho", hint:"Gire o cubo para a direita"},
+ {key:"F", name:"Frente", color:"green", label:"Verde", hint:"Aponte o verde para a câmera"},
+ {key:"D", name:"Base", color:"yellow", label:"Amarelo", hint:"Vire o cubo para baixo"},
+ {key:"L", name:"Esquerda", color:"orange", label:"Laranja", hint:"Gire para a esquerda"},
+ {key:"B", name:"Trás", color:"blue", label:"Azul", hint:"Mostre o fundo do cubo"}
+];
 
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p style="margin-top: 20px;">Calculando solução...</p>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
-        </div>
-    </div>
+const GRID = 3;
+const STABLE_TIME = 1000; // ms
 
-    <script>
-        // Cube state management
-        const cubeState = {
-            U: Array(9).fill('white'),
-            R: Array(9).fill('red'),
-            F: Array(9).fill('green'),
-            L: Array(9).fill('orange'),
-            B: Array(9).fill('blue'),
-            D: Array(9).fill('yellow')
-        };
 
-        const faceOrder = ['U', 'R', 'F', 'L', 'B', 'D'];
-        let currentFace = 'U';
-        let isManualMode = false;
-        let selectedColor = 'white';
-        let stream = null;
+////////////////////////////////////////////////////
+// VARIÁVEIS
+////////////////////////////////////////////////////
 
-        // Advanced color detection profiles
-        const colorProfiles = {
-            white: { 
-                rgb: [255, 255, 255], 
-                hsv: {h: [0, 360], s: [0, 30], v: [180, 255]},
-                lab: {l: [90, 100], a: [-10, 10], b: [-10, 10]},
-                tolerance: 35 
-            },
-            red: { 
-                rgb: [255, 68, 68], 
-                hsv: {h: [340, 20], s: [100, 255], v: [100, 255]},
-                lab: {l: [40, 60], a: [40, 80], b: [30, 60]},
-                tolerance: 40 
-            },
-            green: { 
-                rgb: [68, 255, 68], 
-                hsv: {h: [100, 140], s: [100, 255], v: [100, 255]},
-                lab: {l: [50, 70], a: [-60, -20], b: [40, 80]},
-                tolerance: 40 
-            },
-            orange: { 
-                rgb: [255, 136, 68], 
-                hsv: {h: [15, 45], s: [100, 255], v: [150, 255]},
-                lab: {l: [60, 80], a: [20, 60], b: [50, 90]},
-                tolerance: 40 
-            },
-            blue: { 
-                rgb: [68, 68, 255], 
-                hsv: {h: [200, 260], s: [100, 255], v: [100, 255]},
-                lab: {l: [30, 50], a: [10, 50], b: [-80, -40]},
-                tolerance: 40 
-            },
-            yellow: { 
-                rgb: [255, 255, 68], 
-                hsv: {h: [50, 70], s: [100, 255], v: [200, 255]},
-                lab: {l: [85, 95], a: [-20, 20], b: [60, 100]},
-                tolerance: 35 
-            }
-        };
+const video   = document.getElementById("video");
+const canvas  = document.getElementById("canvas");
+const ctx     = canvas.getContext("2d");
 
-        // DOM Elements
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const overlay = document.getElementById('overlay');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const overlayCtx = overlay.getContext('2d');
+const preview = document.getElementById("preview");
+const info    = document.getElementById("info");
 
-        // Initialize camera
-        async function initCamera() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        advanced: [
-                            { exposureMode: 'manual' },
-                            { whiteBalanceMode: 'manual' }
-                        ]
-                    }
-                });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    overlay.width = video.videoWidth;
-                    overlay.height = video.videoHeight;
-                    startDetectionLoop();
-                };
-            } catch (err) {
-                alert('Erro ao acessar câmera: ' + err.message);
-            }
+let faceIndex = 0;
+
+let lastColors = null;
+let stableTimer = null;
+
+let cube = {}; // {U:[],R:[],...}
+
+
+////////////////////////////////////////////////////
+// INIT
+////////////////////////////////////////////////////
+
+async function start(){
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video:{
+            facingMode:"environment",
+            width:{ideal:1280},
+            height:{ideal:720}
         }
+    });
 
-        // Advanced color detection algorithm
-        function detectColor(r, g, b) {
-            const hsv = rgbToHsv(r, g, b);
-            const lab = rgbToLab(r, g, b);
-            
-            let bestMatch = null;
-            let bestScore = -1;
-            let confidence = 0;
+    video.srcObject = stream;
 
-            for (const [colorName, profile] of Object.entries(colorProfiles)) {
-                let score = 0;
-                let checks = 0;
+    video.onloadedmetadata = ()=>{
 
-                // HSV Check with hue wrapping for red
-                if (profile.hsv) {
-                    let hMatch = false;
-                    if (colorName === 'red' && (hsv.h > 340 || hsv.h < 20)) {
-                        hMatch = true;
-                    } else if (hsv.h >= profile.hsv.h[0] && hsv.h <= profile.hsv.h[1]) {
-                        hMatch = true;
-                    }
-                    
-                    if (hMatch) score += 2;
-                    if (hsv.s >= profile.hsv.s[0] && hsv.s <= profile.hsv.s[1]) score += 1;
-                    if (hsv.v >= profile.hsv.v[0] && hsv.v <= profile.hsv.v[1]) score += 1;
-                    checks += 4;
-                }
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-                // LAB Check (perceptual uniformity)
-                if (profile.lab) {
-                    if (lab.l >= profile.lab.l[0] && lab.l <= profile.lab.l[1]) score += 1;
-                    if (lab.a >= profile.lab.a[0] && lab.a <= profile.lab.a[1]) score += 1;
-                    if (lab.b >= profile.lab.b[0] && lab.b <= profile.lab.b[1]) score += 1;
-                    checks += 3;
-                }
+        initPreview();
+        updateInfo();
 
-                // RGB Euclidean distance with weight
-                const rgbDist = Math.sqrt(
-                    Math.pow(r - profile.rgb[0], 2) * 0.3 +
-                    Math.pow(g - profile.rgb[1], 2) * 0.5 +
-                    Math.pow(b - profile.rgb[2], 2) * 0.2
-                );
-                
-                const rgbScore = Math.max(0, 1 - (rgbDist / (profile.tolerance * 3)));
-                score += rgbScore * 3;
-                checks += 3;
+        loop();
+    };
+}
 
-                const finalScore = score / checks;
-                
-                if (finalScore > bestScore) {
-                    bestScore = finalScore;
-                    bestMatch = colorName;
-                    confidence = finalScore;
-                }
-            }
+////////////////////////////////////////////////////
+// UI
+////////////////////////////////////////////////////
 
-            // Special handling for white vs light colors
-            if (bestMatch !== 'white' && r > 200 && g > 200 && b > 200) {
-                if (Math.abs(r - g) < 20 && Math.abs(g - b) < 20) {
-                    bestMatch = 'white';
-                    confidence = 0.9;
-                }
-            }
+function initPreview(){
 
-            return { color: bestMatch, confidence: confidence };
-        }
+    preview.innerHTML="";
 
-        // Color space conversions
-        function rgbToHsv(r, g, b) {
-            r /= 255; g /= 255; b /= 255;
-            const max = Math.max(r, g, b), min = Math.min(r, g, b);
-            let h, s, v = max;
-            const d = max - min;
-            s = max === 0 ? 0 : d / max;
+    for(let i=0;i<9;i++){
+        let d = document.createElement("div");
+        d.className = "cell";
+        preview.appendChild(d);
+    }
+}
 
-            if (max === min) {
-                h = 0;
-            } else {
-                switch (max) {
-                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                    case g: h = (b - r) / d + 2; break;
-                    case b: h = (r - g) / d + 4; break;
-                }
-                h /= 6;
-            }
-            return { h: h * 360, s: s * 255, v: v * 255 };
-        }
+function updatePreview(colors){
 
-        function rgbToLab(r, g, b) {
-            // Simplified RGB to LAB conversion
-            let x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
-            let y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
-            let z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
+    document.querySelectorAll(".cell")
+    .forEach((c,i)=>{
+        c.style.background = colors[i];
+    });
+}
 
-            x /= 95.047; y /= 100.0; z /= 108.883;
-            
-            const transform = (t) => t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
-            
-            x = transform(x); y = transform(y); z = transform(z);
-            
-            return {
-                l: 116 * y - 16,
-                a: 500 * (x - y),
-                b: 200 * (y - z)
-            };
-        }
+function updateInfo(){
 
-        // Real-time detection loop
-        function startDetectionLoop() {
-            function loop() {
-                if (!isManualMode) {
-                    detectFrame();
-                }
-                requestAnimationFrame(loop);
-            }
-            loop();
-        }
+    if(faceIndex < 6){
 
-        function detectFrame() {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            const grid = document.getElementById('scanGrid');
-            const cells = grid.querySelectorAll('.scan-cell');
-            const preview = document.getElementById('detectionPreview');
-            
-            // Clear previous detection preview occasionally
-            if (Math.random() < 0.1) preview.innerHTML = '';
+        let f = ORDER[faceIndex];
 
-            cells.forEach((cell, index) => {
-                const rect = cell.getBoundingClientRect();
-                const containerRect = document.querySelector('.camera-container').getBoundingClientRect();
-                
-                const x = ((rect.left - containerRect.left) / containerRect.width) * canvas.width;
-                const y = ((rect.top - containerRect.top) / containerRect.height) * canvas.height;
-                const w = (rect.width / containerRect.width) * canvas.width;
-                const h = (rect.height / containerRect.height) * canvas.height;
+        info.innerHTML = `
+            <b>${f.name} (${f.label})</b><br>
+            ${f.hint}
+        `;
 
-                // Sample center region for better accuracy
-                const sampleX = Math.floor(x + w * 0.3);
-                const sampleY = Math.floor(y + h * 0.3);
-                const sampleW = Math.floor(w * 0.4);
-                const sampleH = Math.floor(h * 0.4);
+    }else{
 
-                try {
-                    const frame = ctx.getImageData(sampleX, sampleY, sampleW, sampleH);
-                    const result = analyzeRegion(frame);
-                    
-                    // Visual feedback
-                    if (result.confidence > 0.6) {
-                        cell.style.background = `rgba(${getColorRGB(result.color)}, 0.3)`;
-                        cell.style.borderColor = getColorHex(result.color);
-                    } else {
-                        cell.style.background = 'rgba(255,255,255,0.05)';
-                        cell.style.borderColor = 'rgba(255,255,255,0.3)';
-                    }
+        info.innerText = "Escaneamento concluído!";
+    }
+}
 
-                    // Update preview occasionally
-                    if (index === 4 && Math.random() < 0.2) {
-                        updateDetectionPreview(result);
-                    }
-                } catch (e) {
-                    // Ignore out of bounds errors
-                }
-            });
-        }
 
-        function analyzeRegion(imageData) {
-            const data = imageData.data;
-            const len = data.length;
-            let r = 0, g = 0, b = 0;
-            let count = 0;
+////////////////////////////////////////////////////
+// LOOP PRINCIPAL
+////////////////////////////////////////////////////
 
-            // Skip alpha and sample every 4th pixel for performance
-            for (let i = 0; i < len; i += 16) {
-                r += data[i];
-                g += data[i + 1];
-                b += data[i + 2];
-                count++;
-            }
+function loop(){
 
-            r = Math.round(r / count);
-            g = Math.round(g / count);
-            b = Math.round(b / count);
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
 
-            // Apply brightness/saturation adjustments
-            const brightness = parseFloat(document.getElementById('rangeBrightness').value);
-            const saturation = parseFloat(document.getElementById('rangeSaturation').value);
-            
-            r = Math.min(255, r * brightness);
-            g = Math.min(255, g * brightness);
-            b = Math.min(255, b * brightness);
+    drawGrid();
 
-            return detectColor(r, g, b);
-        }
+    let colors = scanColors();
 
-        function getColorRGB(colorName) {
-            const colors = {
-                white: '255,255,255', red: '255,68,68', green: '68,255,68',
-                orange: '255,136,68', blue: '68,68,255', yellow: '255,255,68'
-            };
-            return colors[colorName] || '128,128,128';
-        }
+    if(colors){
 
-        function getColorHex(colorName) {
-            const colors = {
-                white: '#ffffff', red: '#ff4444', green: '#44ff44',
-                orange: '#ff8844', blue: '#4444ff', yellow: '#ffff44'
-            };
-            return colors[colorName] || '#888888';
-        }
+        updatePreview(colors);
 
-        function updateDetectionPreview(result) {
-            const preview = document.getElementById('detectionPreview');
-            const div = document.createElement('div');
-            div.className = 'detected-color';
-            div.style.background = getColorHex(result.color);
-            div.innerHTML = `<div class="confidence-bar"><div class="confidence-fill" style="width: ${result.confidence * 100}%"></div></div>`;
-            
-            if (preview.children.length > 8) {
-                preview.removeChild(preview.firstChild);
-            }
-            preview.appendChild(div);
-        }
+        checkStable(colors);
+    }
 
-        // Capture current frame
-        function captureFrame() {
-            const flash = document.getElementById('flash');
-            flash.classList.add('active');
-            setTimeout(() => flash.classList.remove('active'), 100);
+    requestAnimationFrame(loop);
+}
 
-            const cells = document.querySelectorAll('.scan-cell');
-            const faceData = [];
 
-            cells.forEach((cell, index) => {
-                const rect = cell.getBoundingClientRect();
-                const containerRect = document.querySelector('.camera-container').getBoundingClientRect();
-                
-                const x = ((rect.left - containerRect.left) / containerRect.width) * canvas.width;
-                const y = ((rect.top - containerRect.top) / containerRect.height) * canvas.height;
-                const w = (rect.width / containerRect.width) * canvas.width;
-                const h = (rect.height / containerRect.height) * canvas.height;
+////////////////////////////////////////////////////
+// GRID
+////////////////////////////////////////////////////
 
-                const sampleX = Math.floor(x + w * 0.3);
-                const sampleY = Math.floor(y + h * 0.3);
-                const sampleW = Math.floor(w * 0.4);
-                const sampleH = Math.floor(h * 0.4);
+function drawGrid(){
 
-                try {
-                    const frame = ctx.getImageData(sampleX, sampleY, sampleW, sampleH);
-                    const result = analyzeRegion(frame);
-                    faceData[index] = result.confidence > 0.5 ? result.color : 'unknown';
-                } catch (e) {
-                    faceData[index] = 'unknown';
-                }
-            });
+    let size = Math.min(canvas.width,canvas.height) * 0.65;
 
-            // Validate center color matches expected face
-            const expectedCenter = document.querySelector('.face-btn.active').dataset.color;
-            if (faceData[4] !== expectedCenter && faceData[4] !== 'unknown') {
-                if (!confirm(`Cor central detectada (${faceData[4]}) diferente do esperado (${expectedCenter}). Continuar mesmo assim?`)) {
-                    return;
-                }
-            }
+    let x0 = (canvas.width - size)/2;
+    let y0 = (canvas.height - size)/2;
 
-            cubeState[currentFace] = faceData;
-            updatePreview();
-            checkCompletion();
-            
-            // Auto-advance to next face
-            const currentIndex = faceOrder.indexOf(currentFace);
-            if (currentIndex < 5) {
-                setTimeout(() => selectFace(faceOrder[currentIndex + 1]), 500);
-            }
-        }
+    let cell = size/3;
 
-        // Auto-scan all faces
-        async function autoScan() {
-            const btn = document.getElementById('btnAuto');
-            btn.disabled = true;
-            btn.innerHTML = '<span>⏳</span> Escaneando...';
+    ctx.strokeStyle = "#00ff00";
+    ctx.lineWidth = 3;
 
-            for (let i = 0; i < faceOrder.length; i++) {
-                selectFace(faceOrder[i]);
-                await new Promise(r => setTimeout(r, 800));
-                captureFrame();
-                await new Promise(r => setTimeout(r, 500));
-            }
+    for(let i=0;i<3;i++){
+        for(let j=0;j<3;j++){
 
-            btn.disabled = false;
-            btn.innerHTML = '<span>🔄</span> Auto-Scan';
-        }
-
-        // UI Functions
-        function selectFace(face) {
-            currentFace = face;
-            document.querySelectorAll('.face-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.dataset.face === face) btn.classList.add('active');
-            });
-            
-            const names = {U: 'White (Up)', R: 'Red (Right)', F: 'Green (Front)', 
-                          L: 'Orange (Left)', B: 'Blue (Back)', D: 'Yellow (Down)'};
-            document.getElementById('currentFaceName').textContent = names[face];
-            updatePreview();
-        }
-
-        function updatePreview() {
-            const grid = document.getElementById('previewGrid');
-            grid.innerHTML = '';
-            
-            cubeState[currentFace].forEach((color, index) => {
-                const div = document.createElement('div');
-                div.className = 'preview-cell';
-                div.style.background = getColorHex(color);
-                div.dataset.index = index;
-                div.onclick = () => {
-                    if (isManualMode) {
-                        cubeState[currentFace][index] = selectedColor;
-                        updatePreview();
-                        checkCompletion();
-                    }
-                };
-                grid.appendChild(div);
-            });
-
-            // Update face button status
-            const faceBtn = document.querySelector(`.face-btn[data-face="${currentFace}"]`);
-            const isComplete = cubeState[currentFace].every(c => c !== 'unknown');
-            faceBtn.classList.toggle('completed', isComplete);
-        }
-
-        function checkCompletion() {
-            const allComplete = faceOrder.every(face => 
-                cubeState[face].every(c => c !== 'unknown')
+            ctx.strokeRect(
+                x0 + i*cell,
+                y0 + j*cell,
+                cell, cell
             );
-            document.getElementById('btnSolve').disabled = !allComplete;
+        }
+    }
+
+    ctx.grid = {x0,y0,cell};
+}
+
+
+////////////////////////////////////////////////////
+// SCAN CORES
+////////////////////////////////////////////////////
+
+function scanColors(){
+
+    if(!ctx.grid) return;
+
+    let {x0,y0,cell} = ctx.grid;
+
+    let result = [];
+
+    for(let i=0;i<3;i++){
+        for(let j=0;j<3;j++){
+
+            let cx = x0 + i*cell + cell/2;
+            let cy = y0 + j*cell + cell/2;
+
+            let img = ctx.getImageData(
+                cx-6, cy-6, 12, 12
+            ).data;
+
+            let r=0,g=0,b=0,n=0;
+
+            for(let k=0;k<img.length;k+=4){
+                r+=img[k];
+                g+=img[k+1];
+                b+=img[k+2];
+                n++;
+            }
+
+            r/=n; g/=n; b/=n;
+
+            let hsv = rgb2hsv(r,g,b);
+
+            let color = classify(hsv);
+
+            result.push(color);
+
+            // Marcador visual
+            ctx.beginPath();
+            ctx.arc(cx,cy,6,0,Math.PI*2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+    }
+
+    return result;
+}
+
+
+////////////////////////////////////////////////////
+// RGB -> HSV
+////////////////////////////////////////////////////
+
+function rgb2hsv(r,g,b){
+
+    r/=255; g/=255; b/=255;
+
+    let max = Math.max(r,g,b);
+    let min = Math.min(r,g,b);
+
+    let h,s,v = max;
+
+    let d = max - min;
+
+    s = max===0 ? 0 : d/max;
+
+    if(max === min){
+        h = 0;
+    }else{
+
+        switch(max){
+            case r: h=(g-b)/d+(g<b?6:0); break;
+            case g: h=(b-r)/d+2; break;
+            case b: h=(r-g)/d+4; break;
         }
 
-        // Manual mode toggle
-        document.getElementById('btnToggleManual').addEventListener('click', () => {
-            isManualMode = !isManualMode;
-            document.getElementById('colorPicker').style.display = isManualMode ? 'flex' : 'none';
-            document.getElementById('btnToggleManual').innerHTML = 
-                isManualMode ? '<span>📷</span> Modo Câmera' : '<span>✏️</span> Editar Manual';
-        });
+        h *= 60;
+    }
 
-        // Color picker
-        document.querySelectorAll('.color-option').forEach(opt => {
-            opt.addEventListener('click', () => {
-                document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
-                opt.classList.add('selected');
-                selectedColor = opt.dataset.color;
-            });
-        });
+    return {h,s,v};
+}
 
-        // Face buttons
-        document.querySelectorAll('.face-btn').forEach(btn => {
-            btn.addEventListener('click', () => selectFace(btn.dataset.face));
-        });
 
-        // Main controls
-        document.getElementById('btnScan').addEventListener('click', captureFrame);
-        document.getElementById('btnAuto').addEventListener('click', autoScan);
-        document.getElementById('btnReset').addEventListener('click', () => {
-            if (confirm('Limpar todo o cubo?')) {
-                faceOrder.forEach(face => {
-                    cubeState[face] = Array(9).fill('unknown');
-                });
-                document.querySelectorAll('.face-btn').forEach(btn => btn.classList.remove('completed'));
-                updatePreview();
-                checkCompletion();
-            }
-        });
+////////////////////////////////////////////////////
+// CLASSIFICAÇÃO HSV
+////////////////////////////////////////////////////
 
-        // Settings panel
-        document.getElementById('btnSettings').addEventListener('click', () => {
-            document.getElementById('settingsPanel').classList.add('open');
-        });
-        document.getElementById('btnCloseSettings').addEventListener('click', () => {
-            document.getElementById('settingsPanel').classList.remove('open');
-        });
+function classify({h,s,v}){
 
-        // Calibration
-        document.getElementById('btnCalibrate').addEventListener('click', () => {
-            const panel = document.getElementById('calibrationPanel');
-            panel.classList.toggle('active');
-            
-            if (panel.classList.contains('active')) {
-                const grid = document.getElementById('calibrationGrid');
-                grid.innerHTML = '';
-                
-                Object.entries(colorProfiles).forEach(([name, profile]) => {
-                    const div = document.createElement('div');
-                    div.className = 'calib-item';
-                    div.innerHTML = `
-                        <div class="color-sample" style="background: rgb(${profile.rgb.join(',')})"></div>
-                        <div style="flex: 1;">
-                            <div style="text-transform: capitalize; font-weight: bold;">${name}</div>
-                            <input type="range" class="tolerance-slider" 
-                                   min="20" max="60" value="${profile.tolerance}" 
-                                   data-color="${name}">
-                        </div>
-                    `;
-                    grid.appendChild(div);
-                });
-            }
-        });
+    if(v>0.8 && s<0.25) return "white";
 
-        document.getElementById('btnSaveCalib').addEventListener('click', () => {
-            document.querySelectorAll('.tolerance-slider').forEach(slider => {
-                const color = slider.dataset.color;
-                colorProfiles[color].tolerance = parseInt(slider.value);
-            });
-            document.getElementById('calibrationPanel').classList.remove('active');
-            alert('Calibração salva!');
-        });
+    if(h<15 || h>340) return "red";
 
-        document.getElementById('btnResetCalib').addEventListener('click', () => {
-            location.reload(); // Simple reset
-        });
+    if(h>15 && h<45) return "orange";
 
-        // Solve function (simplified - would integrate with actual solver)
-        document.getElementById('btnSolve').addEventListener('click', async () => {
-            const loading = document.getElementById('loading');
-            loading.classList.add('active');
-            
-            // Simulate solving process
-            const progress = document.getElementById('progressFill');
-            for (let i = 0; i <= 100; i += 10) {
-                progress.style.width = i + '%';
-                await new Promise(r => setTimeout(r, 200));
-            }
-            
-            // Here you would integrate with a real solver like Kociemba
-            // For demo, we'll just show the cube state
-            console.log('Cube state:', cubeState);
-            
-            loading.classList.remove('active');
-            
-            // Generate solution URL or display steps
-            const solution = generateSolution(cubeState);
-            alert(`Solução calculada!\n\n${solution}\n\n(Integração completa com algoritmo Kociemba necessária para solução ótima)`);
-        });
+    if(h>45 && h<70) return "yellow";
 
-        function generateSolution(state) {
-            // This is a placeholder - real implementation would use Kociemba or similar
-            return "R U R' U' (Exemplo de movimento)\nIntegrar com biblioteca de resolução para solução completa em ~20 movimentos.";
+    if(h>80 && h<160) return "green";
+
+    if(h>190 && h<260) return "blue";
+
+    return "gray";
+}
+
+
+////////////////////////////////////////////////////
+// VALIDAÇÃO CENTRO
+////////////////////////////////////////////////////
+
+function validateCenter(colors){
+
+    let center = colors[4];
+
+    let expected = ORDER[faceIndex].color;
+
+    return center === expected;
+}
+
+
+////////////////////////////////////////////////////
+// ESTABILIDADE
+////////////////////////////////////////////////////
+
+function checkStable(colors){
+
+    if(colors.includes("gray")){
+        resetStable();
+        return;
+    }
+
+    if(!validateCenter(colors)){
+        info.innerHTML = "⚠️ Face incorreta!<br>Ajuste o cubo.";
+        resetStable();
+        return;
+    }
+
+    if(!lastColors){
+        lastColors = [...colors];
+        return;
+    }
+
+    let same = true;
+
+    for(let i=0;i<9;i++){
+        if(colors[i] !== lastColors[i]){
+            same = false;
+            break;
         }
+    }
 
-        // Initialize
-        initCamera();
-        updatePreview();
+    if(!same){
+        resetStable();
+        lastColors = [...colors];
+        return;
+    }
 
-        // Handle visibility change
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden && stream) {
-                stream.getTracks().forEach(track => track.pause());
-            } else if (stream) {
-                stream.getTracks().forEach(track => track.resume());
-            }
+    if(!stableTimer){
+
+        stableTimer = setTimeout(()=>{
+
+            saveFace(colors);
+
+        }, STABLE_TIME);
+    }
+}
+
+
+function resetStable(){
+
+    clearTimeout(stableTimer);
+
+    stableTimer = null;
+    lastColors = null;
+
+    updateInfo();
+}
+
+
+////////////////////////////////////////////////////
+// SALVAR FACE
+////////////////////////////////////////////////////
+
+function saveFace(colors){
+
+    let key = ORDER[faceIndex].key;
+
+    cube[key] = [...colors];
+
+    console.log("Face salva:", key, colors);
+
+    faceIndex++;
+
+    resetStable();
+
+    updateInfo();
+
+    if(faceIndex >= 6){
+        finish();
+    }
+}
+
+
+////////////////////////////////////////////////////
+// FINAL
+////////////////////////////////////////////////////
+
+function finish(){
+
+    stopCamera();
+
+    console.log("Cubo completo:", cube);
+
+    alert("Cubo escaneado com sucesso!");
+
+    let str = cubeToSolverString(cube);
+
+    console.log("String Solver:", str);
+
+    // Aqui você conecta no algoritmo de solução
+}
+
+
+function stopCamera(){
+
+    if(video.srcObject){
+
+        video.srcObject.getTracks()
+        .forEach(t=>t.stop());
+    }
+}
+
+
+////////////////////////////////////////////////////
+// CONVERSÃO PARA SOLVER
+////////////////////////////////////////////////////
+
+function cubeToSolverString(cube){
+
+    const map = {
+        white:"U",
+        red:"R",
+        green:"F",
+        yellow:"D",
+        orange:"L",
+        blue:"B"
+    };
+
+    const order = ["U","R","F","D","L","B"];
+
+    let result = "";
+
+    order.forEach(f=>{
+
+        cube[f].forEach(c=>{
+            result += map[c];
         });
-    </script>
+
+    });
+
+    return result;
+}
+
+
+////////////////////////////////////////////////////
+// START
+////////////////////////////////////////////////////
+
+start();
+
+</script>
+
 </body>
 </html>
