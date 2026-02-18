@@ -2,93 +2,950 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NeonCube Scanner</title>
-    <link rel="stylesheet" href="css/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rubik Solver - Captura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: white;
+            overflow: hidden;
+            touch-action: none;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        .app-header {
+            position: fixed;
+            top: env(safe-area-inset-top);
+            left: 0; right: 0;
+            height: 50px;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(20px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        .header-subtitle {
+            position: absolute;
+            right: 16px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        /* Container principal */
+        .main-container {
+            position: fixed;
+            top: calc(env(safe-area-inset-top) + 50px);
+            left: 0; right: 0;
+            bottom: env(safe-area-inset-bottom);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Área da câmera com cubo 3D overlay */
+        .camera-area {
+            position: relative;
+            flex: 1;
+            background: #0a0a0a;
+            overflow: hidden;
+        }
+        
+        #video {
+            position: absolute;
+            inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+        
+        .camera-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            z-index: 5;
+        }
+        
+        .start-btn {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border: 4px solid rgba(255,255,255,0.3);
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            box-shadow: 0 8px 30px rgba(34,197,94,0.5);
+            animation: pulse-btn 2s infinite;
+        }
+        
+        @keyframes pulse-btn {
+            0%, 100% { transform: scale(1); box-shadow: 0 8px 30px rgba(34,197,94,0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 12px 40px rgba(34,197,94,0.7); }
+        }
+        
+        /* Grade de scan centralizada */
+        .scan-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            pointer-events: none;
+        }
+        
+        .scan-grid {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(240px, 60vw);
+            height: min(240px, 60vw);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            padding: 6px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .scan-cell {
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.05);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .scan-cell.detected {
+            border-color: #22c55e;
+            background: rgba(34,197,94,0.2);
+            box-shadow: 0 0 20px rgba(34,197,94,0.4);
+        }
+        
+        .scan-cell.stable {
+            animation: stable-flash 0.5s ease;
+        }
+        
+        @keyframes stable-flash {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(0.95); background: rgba(34,197,94,0.5); }
+        }
+        
+        /* Cubo 3D preview no canto */
+        .cube-preview-3d {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+            z-index: 20;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        #cube-3d-mini {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Indicador de progresso lateral */
+        .progress-sidebar {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .progress-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0.4;
+            transition: all 0.3s;
+        }
+        
+        .progress-item.active {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .progress-item.done {
+            opacity: 0.8;
+        }
+        
+        .progress-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+        
+        .progress-item.active .progress-dot {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            box-shadow: 0 0 10px #3b82f6;
+        }
+        
+        .progress-item.done .progress-dot {
+            background: #22c55e;
+            border-color: #22c55e;
+        }
+        
+        .progress-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        /* Status e timer */
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 20;
+        }
+        
+        .status-text {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+        
+        .stability-timer {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+        
+        .stability-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        /* Botões de ação */
+        .action-buttons {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 12px;
+            z-index: 20;
+        }
+        
+        .action-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+        
+        .action-btn:active {
+            transform: scale(0.95);
+            background: rgba(255,255,255,0.25);
+        }
+        
+        .action-btn.primary {
+            background: #22c55e;
+            width: auto;
+            padding: 0 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 700;
+            display: none;
+            animation: pulse-solution 2s infinite;
+        }
+        
+        @keyframes pulse-solution {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(34,197,94,0); }
+        }
+        
+        /* Tela de confirmação (apenas se necessário) */
+        .confirm-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 50;
+            padding: 20px;
+        }
+        
+        .confirm-grid {
+            width: 200px;
+            height: 200px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            padding: 8px;
+            background: #2a2a2a;
+            border-radius: 12px;
+        }
+        
+        .confirm-cell {
+            border-radius: 8px;
+        }
+        
+        /* Manual override modal */
+        .manual-modal {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            flex-direction: column;
+            z-index: 60;
+            padding: 20px;
+        }
+        
+        .manual-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 20px auto;
+            width: min(280px, 80vw);
+        }
+        
+        .manual-cell {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .manual-cell:active {
+            transform: scale(0.95);
+        }
+        
+        .color-picker {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .color-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .color-option.selected {
+            border-color: white;
+            transform: scale(1.2);
+            box-shadow: 0 0 20px currentColor;
+        }
+        
+        input[type="file"] { display: none; }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <!-- Scanner Screen -->
-        <div id="scanner" class="screen active">
-            <div class="scanner-header">
-                <h1 class="neon-text">NEON<span class="cyan">CUBE</span></h1>
-                <p id="instruction" class="instruction pulse">Posicione a face BRANCA no centro</p>
+
+    <div class="app-header">
+        <div class="header-title" id="header-title">Mostre a face VERDE</div>
+        <div class="header-subtitle" id="face-counter">1/6</div>
+    </div>
+
+    <div class="main-container">
+        <div class="camera-area">
+            <video id="video" autoplay playsinline muted></video>
+            
+            <div class="camera-placeholder" id="camera-placeholder">
+                <button class="start-btn" onclick="startCamera()">📷</button>
+                <p style="color: rgba(255,255,255,0.7); font-size: 14px;">Toque para iniciar a câmera</p>
             </div>
-
-            <div class="camera-container">
-                <video id="camera" autoplay playsinline></video>
-                <canvas id="overlay"></canvas>
-                
-                <!-- Grid 3x3 -->
-                <div class="scan-grid" id="scanGrid">
-                    <div class="grid-cell" data-pos="0"></div>
-                    <div class="grid-cell" data-pos="1"></div>
-                    <div class="grid-cell" data-pos="2"></div>
-                    <div class="grid-cell" data-pos="3"></div>
-                    <div class="grid-cell center" data-pos="4"></div>
-                    <div class="grid-cell" data-pos="5"></div>
-                    <div class="grid-cell" data-pos="6"></div>
-                    <div class="grid-cell" data-pos="7"></div>
-                    <div class="grid-cell" data-pos="8"></div>
-                </div>
-
-                <!-- Face indicator -->
-                <div class="face-indicator" id="faceIndicator">
-                    <span class="current-face">Face: <span id="currentFaceName">BRANCO</span></span>
-                    <div class="progress-dots">
-                        <span class="dot active" data-face="U"></span>
-                        <span class="dot" data-face="R"></span>
-                        <span class="dot" data-face="F"></span>
-                        <span class="dot" data-face="D"></span>
-                        <span class="dot" data-face="L"></span>
-                        <span class="dot" data-face="B"></span>
+            
+            <div class="scan-overlay" id="scan-overlay">
+                <!-- Progresso lateral -->
+                <div class="progress-sidebar" id="progress-sidebar">
+                    <div class="progress-item active" data-face="F">
+                        <div class="progress-dot" style="background: #00FF00;"></div>
+                        <span class="progress-label">Frente</span>
+                    </div>
+                    <div class="progress-item" data-face="R">
+                        <div class="progress-dot" style="background: #FF0000;"></div>
+                        <span class="progress-label">Direita</span>
+                    </div>
+                    <div class="progress-item" data-face="B">
+                        <div class="progress-dot" style="background: #0000FF;"></div>
+                        <span class="progress-label">Trás</span>
+                    </div>
+                    <div class="progress-item" data-face="L">
+                        <div class="progress-dot" style="background: #FFA500;"></div>
+                        <span class="progress-label">Esquerda</span>
+                    </div>
+                    <div class="progress-item" data-face="U">
+                        <div class="progress-dot" style="background: #FFFFFF;"></div>
+                        <span class="progress-label">Topo</span>
+                    </div>
+                    <div class="progress-item" data-face="D">
+                        <div class="progress-dot" style="background: #FFFF00;"></div>
+                        <span class="progress-label">Base</span>
                     </div>
                 </div>
-            </div>
-
-            <!-- Preview 3D Mini -->
-            <div class="preview-3d" id="preview3d">
-                <div class="preview-label">Preview</div>
-                <canvas id="previewCanvas"></canvas>
-            </div>
-
-            <!-- Color Palette for manual correction -->
-            <div class="color-palette" id="colorPalette">
-                <div class="color-btn white" data-color="white" data-hex="#FFFFFF"></div>
-                <div class="color-btn yellow" data-color="yellow" data-hex="#FFD500"></div>
-                <div class="color-btn red" data-color="red" data-hex="#FF0000"></div>
-                <div class="color-btn orange" data-color="orange" data-hex="#FF8C00"></div>
-                <div class="color-btn blue" data-color="blue" data-hex="#0000FF"></div>
-                <div class="color-btn green" data-color="green" data-hex="#00FF00"></div>
-            </div>
-
-            <div class="controls">
-                <button id="btnCapture" class="neon-btn cyan">CAPTURAR FACE</button>
-                <button id="btnManual" class="neon-btn magenta">AJUSTE MANUAL</button>
-                <button id="btnConfirm" class="neon-btn confirm hidden">CONFIRMAR CUBO</button>
-            </div>
-        </div>
-
-        <!-- Loading Screen -->
-        <div id="loading" class="screen">
-            <div class="loader">
-                <div class="cube-loader">
-                    <div class="face front"></div>
-                    <div class="face back"></div>
-                    <div class="face right"></div>
-                    <div class="face left"></div>
-                    <div class="face top"></div>
-                    <div class="face bottom"></div>
+                
+                <!-- Status -->
+                <div class="status-bar">
+                    <div class="status-text" id="status-text">Centralize o cubo na grade</div>
+                    <div class="stability-timer">
+                        <div class="stability-fill" id="stability-fill"></div>
+                    </div>
+                </div>
+                
+                <!-- Grade de scan -->
+                <div class="scan-grid" id="scan-grid">
+                    <div class="scan-cell" id="scan-0"></div>
+                    <div class="scan-cell" id="scan-1"></div>
+                    <div class="scan-cell" id="scan-2"></div>
+                    <div class="scan-cell" id="scan-3"></div>
+                    <div class="scan-cell" id="scan-4"></div>
+                    <div class="scan-cell" id="scan-5"></div>
+                    <div class="scan-cell" id="scan-6"></div>
+                    <div class="scan-cell" id="scan-7"></div>
+                    <div class="scan-cell" id="scan-8"></div>
+                </div>
+                
+                <!-- Cubo 3D preview -->
+                <div class="cube-preview-3d">
+                    <div id="cube-3d-mini"></div>
+                </div>
+                
+                <!-- Botões -->
+                <div class="action-buttons">
+                    <button class="action-btn" onclick="openManual()" title="Editar manual">✏️</button>
+                    <button class="action-btn" onclick="skipFace()" id="skip-btn">⏭</button>
+                    <button class="action-btn primary" onclick="goToSolution()" id="solution-btn">Ver Solução →</button>
                 </div>
             </div>
-            <p class="neon-text">Processando...</p>
+            
+            <!-- Tela de confirmação manual -->
+            <div class="manual-modal" id="manual-modal">
+                <div style="text-align: center; margin-top: 40px;">
+                    <h2 style="font-size: 20px; margin-bottom: 8px;">Ajuste Manual</h2>
+                    <p style="color: rgba(255,255,255,0.6); font-size: 14px;">Toque nas cores abaixo e depois nas células</p>
+                </div>
+                
+                <div class="manual-grid" id="manual-grid">
+                    <!-- Gerado via JS -->
+                </div>
+                
+                <div class="color-picker" id="color-picker">
+                    <div class="color-option selected" style="background: #FFFFFF;" data-color="U" data-hex="#FFFFFF"></div>
+                    <div class="color-option" style="background: #FFD500;" data-color="D" data-hex="#FFD500"></div>
+                    <div class="color-option" style="background: #FF0000;" data-color="R" data-hex="#FF0000"></div>
+                    <div class="color-option" style="background: #FFA500;" data-color="L" data-hex="#FFA500"></div>
+                    <div class="color-option" style="background: #00FF00;" data-color="F" data-hex="#00FF00"></div>
+                    <div class="color-option" style="background: #0000FF;" data-color="B" data-hex="#0000FF"></div>
+                </div>
+                
+                <div style="margin-top: auto; display: flex; gap: 12px; justify-content: center; padding-bottom: 40px;">
+                    <button onclick="closeManual()" style="padding: 12px 24px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.3); background: transparent; color: white; font-weight: 600;">Cancelar</button>
+                    <button onclick="saveManual()" style="padding: 12px 24px; border-radius: 20px; border: none; background: #22c55e; color: white; font-weight: 600;">Salvar Face</button>
+                </div>
+            </div>
+            
+            <input type="file" id="file-input" accept="image/*" capture="environment" onchange="handleFile(event)">
         </div>
     </div>
 
-    <script src="js/cubejs/cube.js"></script>
-    <script src="js/cubejs/solve.js"></script>
-    <script src="js/scanner.js"></script>
-    <script src="js/app.js"></script>
+    <script>
+        // Ordem de scan: F → R → B → L → U → D
+        const SCAN_ORDER = [
+            { code: 'F', name: 'Frente', color: '#00FF00', center: 'F' },
+            { code: 'R', name: 'Direita', color: '#FF0000', center: 'R' },
+            { code: 'B', name: 'Trás', color: '#0000FF', center: 'B' },
+            { code: 'L', name: 'Esquerda', color: '#FFA500', center: 'L' },
+            { code: 'U', name: 'Topo', color: '#FFFFFF', center: 'U' },
+            { code: 'D', name: 'Base', color: '#FFFF00', center: 'D' }
+        ];
+        
+        const COLOR_MAP = {
+            'U': '#FFFFFF', 'R': '#FF0000', 'F': '#00FF00',
+            'D': '#FFFF00', 'L': '#FFA500', 'B': '#0000FF'
+        };
+        
+        const COLOR_NAMES = { U: 'Branco', R: 'Vermelho', F: 'Verde', D: 'Amarelo', L: 'Laranja', B: 'Azul' };
+        
+        let currentStep = 0;
+        let isScanning = false;
+        let cubeState = {
+            U: Array(9).fill(null), R: Array(9).fill(null), F: Array(9).fill(null),
+            D: Array(9).fill(null), L: Array(9).fill(null), B: Array(9).fill(null)
+        };
+        
+        // Sistema de estabilidade
+        let lastColors = null;
+        let stabilityStart = null;
+        const STABILITY_TIME = 1500; // 1.5 segundos
+        let isStable = false;
+        
+        // Three.js para preview
+        let miniScene, miniCamera, miniRenderer, miniCube;
+        let selectedColor = 'U';
+        
+        window.onload = () => {
+            initMiniCube();
+            updateUI();
+            initManualGrid();
+        };
+        
+        function initMiniCube() {
+            const container = document.getElementById('cube-3d-mini');
+            
+            miniScene = new THREE.Scene();
+            miniScene.background = new THREE.Color(0x000000);
+            
+            miniCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+            miniCamera.position.set(3, 3, 4);
+            miniCamera.lookAt(0, 0, 0);
+            
+            miniRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            miniRenderer.setSize(120, 120);
+            miniRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(miniRenderer.domElement);
+            
+            miniScene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+            dir.position.set(2, 3, 2);
+            miniScene.add(dir);
+            
+            buildMiniCube();
+            animateMini();
+        }
+        
+        function buildMiniCube() {
+            if (miniCube) miniScene.remove(miniCube);
+            miniCube = new THREE.Group();
+            
+            const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+            const colors = { 'U': 0x333333, 'R': 0x333333, 'F': 0x333333, 'D': 0x333333, 'L': 0x333333, 'B': 0x333333 };
+            
+            // Atualiza com cores já capturadas
+            Object.keys(cubeState).forEach(face => {
+                if (cubeState[face][4]) { // Se centro está preenchido
+                    colors[face] = parseInt(COLOR_MAP[face].replace('#', '0x'));
+                }
+            });
+            
+            // Destaca face atual se não capturada
+            const current = SCAN_ORDER[currentStep];
+            if (current && !cubeState[current.code][4]) {
+                colors[current.code] = parseInt(current.color.replace('#', '0x'));
+            }
+            
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        if (x === 0 && y === 0 && z === 0) continue;
+                        
+                        const materials = [
+                            new THREE.MeshLambertMaterial({ color: x === 1 ? colors.R : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: x === -1 ? colors.L : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: y === 1 ? colors.U : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: y === -1 ? colors.D : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: z === 1 ? colors.F : 0x111111 }),
+                            new THREE.MeshLambertMaterial({ color: z === -1 ? colors.B : 0x111111 }),
+                        ];
+                        
+                        const cubie = new THREE.Mesh(geometry, materials);
+                        cubie.position.set(x, y, z);
+                        miniCube.add(cubie);
+                    }
+                }
+            }
+            
+            miniScene.add(miniCube);
+            
+            // Rotação para mostrar face atual
+            if (current) {
+                const rot = { F: [0,0], R: [0, -Math.PI/2], B: [0, Math.PI], L: [0, Math.PI/2], U: [-Math.PI/2, 0], D: [Math.PI/2, 0] }[current.code];
+                miniCube.rotation.x = rot[0];
+                miniCube.rotation.y = rot[1];
+            }
+        }
+        
+        function animateMini() {
+            requestAnimationFrame(animateMini);
+            if (miniCube) {
+                miniCube.rotation.y += 0.005;
+            }
+            miniRenderer.render(miniScene, miniCamera);
+        }
+        
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.style.display = 'block';
+                
+                document.getElementById('camera-placeholder').style.display = 'none';
+                document.getElementById('scan-overlay').style.display = 'block';
+                
+                isScanning = true;
+                resetStability();
+                scanLoop();
+                
+            } catch (e) {
+                // Fallback para input de arquivo
+                document.getElementById('file-input').click();
+            }
+        }
+        
+        function scanLoop() {
+            if (!isScanning || currentStep >= 6) return;
+            
+            const video = document.getElementById('video');
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(video, 0, 0);
+                
+                analyzeFrame(ctx, canvas.width, canvas.height);
+            }
+            
+            requestAnimationFrame(scanLoop);
+        }
+        
+        function analyzeFrame(ctx, w, h) {
+            const cx = w / 2, cy = h / 2;
+            const size = Math.min(w, h) * 0.55;
+            const cellSize = size / 3;
+            
+            const colors = [];
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const x = cx - size/2 + c * cellSize + cellSize/2;
+                    const y = cy - size/2 + r * cellSize + cellSize/2;
+                    const p = getPixel(ctx, x, y);
+                    colors.push(rgbToCode(p.r, p.g, p.b));
+                }
+            }
+            
+            // Verifica se centro está correto
+            const current = SCAN_ORDER[currentStep];
+            const centerColor = colors[4];
+            const isCorrectCenter = (centerColor === current.center);
+            
+            // Atualiza visual da grade
+            updateScanGrid(colors, isCorrectCenter);
+            
+            if (!isCorrectCenter) {
+                document.getElementById('status-text').textContent = `Ops! Centro é ${COLOR_NAMES[centerColor]}, precisa ser ${current.name}`;
+                document.getElementById('status-text').style.color = '#ef4444';
+                resetStability();
+                return;
+            }
+            
+            document.getElementById('status-text').textContent = 'Perfeito! Mantenha estável...';
+            document.getElementById('status-text').style.color = '#22c55e';
+            
+            // Sistema de estabilidade
+            checkStability(colors);
+        }
+        
+        function checkStability(colors) {
+            const now = Date.now();
+            
+            if (!lastColors || !colorsEqual(colors, lastColors)) {
+                lastColors = [...colors];
+                stabilityStart = now;
+                isStable = false;
+                updateStabilityBar(0);
+                return;
+            }
+            
+            const elapsed = now - stabilityStart;
+            const progress = Math.min(elapsed / STABILITY_TIME, 1);
+            updateStabilityBar(progress * 100);
+            
+            if (elapsed >= STABILITY_TIME && !isStable) {
+                isStable = true;
+                onStableDetection(colors);
+            }
+        }
+        
+        function onStableDetection(colors) {
+            // Flash visual
+            document.querySelectorAll('.scan-cell').forEach(cell => {
+                cell.classList.add('stable');
+                setTimeout(() => cell.classList.remove('stable'), 500);
+            });
+            
+            // Salva automaticamente
+            const current = SCAN_ORDER[currentStep];
+            cubeState[current.code] = [...colors];
+            
+            // Feedback tátil
+            if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
+            
+            // Atualiza cubo 3D
+            buildMiniCube();
+            
+            // Próxima face após delay
+            setTimeout(() => {
+                nextFace();
+            }, 600);
+        }
+        
+        function nextFace() {
+            currentStep++;
+            resetStability();
+            
+            if (currentStep >= 6) {
+                finishCapture();
+            } else {
+                updateUI();
+                buildMiniCube();
+            }
+        }
+        
+        function skipFace() {
+            const current = SCAN_ORDER[currentStep];
+            cubeState[current.code] = Array(9).fill(current.center);
+            nextFace();
+        }
+        
+        function finishCapture() {
+            isScanning = false;
+            document.getElementById('status-text').textContent = '✓ Todas as faces capturadas!';
+            document.getElementById('stability-fill').style.width = '100%';
+            document.getElementById('skip-btn').style.display = 'none';
+            document.getElementById('solution-btn').style.display = 'block';
+            
+            localStorage.setItem('rubikState', JSON.stringify(cubeState));
+        }
+        
+        function goToSolution() {
+            window.location.href = 'solution.html';
+        }
+        
+        function updateUI() {
+            const current = SCAN_ORDER[currentStep];
+            document.getElementById('header-title').textContent = `Mostre a face ${current.name.toUpperCase()}`;
+            document.getElementById('face-counter').textContent = `${currentStep + 1}/6`;
+            
+            document.querySelectorAll('.progress-item').forEach((item, idx) => {
+                item.classList.remove('active', 'done');
+                if (idx < currentStep) item.classList.add('done');
+                else if (idx === currentStep) item.classList.add('active');
+            });
+        }
+        
+        function updateScanGrid(colors, isValid) {
+            colors.forEach((code, i) => {
+                const cell = document.getElementById(`scan-${i}`);
+                const color = COLOR_MAP[code] || '#334155';
+                cell.style.backgroundColor = color;
+                cell.style.opacity = '0.9';
+                
+                if (isValid) {
+                    cell.classList.add('detected');
+                } else {
+                    cell.classList.remove('detected');
+                }
+            });
+        }
+        
+        function updateStabilityBar(percent) {
+            document.getElementById('stability-fill').style.width = percent + '%';
+        }
+        
+        function resetStability() {
+            lastColors = null;
+            stabilityStart = null;
+            isStable = false;
+            updateStabilityBar(0);
+        }
+        
+        function colorsEqual(a, b) {
+            return a.every((v, i) => v === b[i]);
+        }
+        
+        // Manual override
+        function initManualGrid() {
+            const grid = document.getElementById('manual-grid');
+            grid.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'manual-cell';
+                cell.dataset.index = i;
+                cell.onclick = () => setManualCell(i);
+                grid.appendChild(cell);
+            }
+            
+            document.querySelectorAll('.color-option').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.color-option').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedColor = btn.dataset.color;
+                };
+            });
+        }
+        
+        function openManual() {
+            const current = SCAN_ORDER[currentStep];
+            const state = cubeState[current.code];
+            
+            document.querySelectorAll('.manual-cell').forEach((cell, i) => {
+                const color = state[i] || current.center;
+                cell.style.backgroundColor = COLOR_MAP[color];
+                cell.dataset.color = color;
+            });
+            
+            document.getElementById('manual-modal').style.display = 'flex';
+        }
+        
+        function closeManual() {
+            document.getElementById('manual-modal').style.display = 'none';
+        }
+        
+        function setManualCell(index) {
+            const cell = document.querySelector(`.manual-cell[data-index="${index}"]`);
+            cell.style.backgroundColor = COLOR_MAP[selectedColor];
+            cell.dataset.color = selectedColor;
+        }
+        
+        function saveManual() {
+            const current = SCAN_ORDER[currentStep];
+            const colors = [];
+            document.querySelectorAll('.manual-cell').forEach(cell => {
+                colors.push(cell.dataset.color || current.center);
+            });
+            
+            cubeState[current.code] = colors;
+            buildMiniCube();
+            closeManual();
+            nextFace();
+        }
+        
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                document.getElementById('camera-placeholder').style.display = 'none';
+                document.getElementById('scan-overlay').style.display = 'block';
+                
+                isScanning = true;
+                resetStability();
+                
+                const process = () => {
+                    if (!isScanning || currentStep >= 6) return;
+                    analyzeFrame(ctx, canvas.width, canvas.height);
+                    requestAnimationFrame(process);
+                };
+                process();
+            };
+            img.src = URL.createObjectURL(file);
+        }
+        
+        function getPixel(ctx, x, y) {
+            const d = ctx.getImageData(Math.max(0, x-5), Math.max(0, y-5), 10, 10).data;
+            let r=0, g=0, b=0, n=0;
+            for (let i=0; i<d.length; i+=4) {
+                r += d[i];
+                g += d[i+1];
+                b += d[i+2];
+                n++;
+            }
+            return {r: r/n, g: g/n, b: b/n};
+        }
+        
+        function rgbToCode(r, g, b) {
+            const [h, s, v] = rgbToHsv(r, g, b);
+            
+            if (v > 0.8 && s < 0.25) return 'U'; // Branco
+            if (v > 0.6 && s > 0.4) {
+                if (h >= 50 && h < 80) return 'D'; // Amarelo
+                if (h >= 15 && h < 45) return 'L'; // Laranja
+                if ((h >= 340 || h < 15) && s > 0.5) return 'R'; // Vermelho
+                if (h >= 80 && h < 160) return 'F'; // Verde
+                if (h >= 200 && h < 270) return 'B'; // Azul
+            }
+            
+            // Fallback baseado em luminosidade
+            if (v > 0.7) return 'U';
+            return 'F';
+        }
+        
+        function rgbToHsv(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h = 0, s = 0, v = max;
+            const d = max - min;
+            s = max === 0 ? 0 : d / max;
+            
+            if (max !== min) {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return [h * 360, s, v];
+        }
+    </script>
 </body>
 </html>
