@@ -124,6 +124,15 @@
         .cube-container:hover .gesture-hint {
             opacity: 1;
         }
+
+        /* Indicador de cor da face */
+        .face-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
     </style>
 <base target="_blank">
 </head>
@@ -165,22 +174,34 @@
         <div class="absolute top-4 left-4 bg-black/50 backdrop-blur px-3 py-1.5 rounded-lg text-xs font-mono text-gray-300 border border-gray-700 z-10">
             <span id="status-text">Pronto</span>
         </div>
-        <div class="gesture-hint">Arraste para girar livremente</div>
+        <div class="gesture-hint">Arraste para girar • Toque para colorir</div>
     </div>
 
     <!-- Face Selector -->
     <div class="px-3 py-2 bg-gray-800/50 backdrop-blur-sm">
         <div class="flex justify-center gap-1.5 mb-2 flex-wrap">
-            <button onclick="selectFace('U')" id="btn-U" class="face-btn px-3 py-2 rounded-xl text-xs">UP</button>
-            <button onclick="selectFace('D')" id="btn-D" class="face-btn px-3 py-2 rounded-xl text-xs">DOWN</button>
-            <button onclick="selectFace('F')" id="btn-F" class="face-btn px-3 py-2 rounded-xl text-xs active">FRONT</button>
-            <button onclick="selectFace('B')" id="btn-B" class="face-btn px-3 py-2 rounded-xl text-xs">BACK</button>
-            <button onclick="selectFace('L')" id="btn-L" class="face-btn px-3 py-2 rounded-xl text-xs">LEFT</button>
-            <button onclick="selectFace('R')" id="btn-R" class="face-btn px-3 py-2 rounded-xl text-xs">RIGHT</button>
+            <button onclick="selectFace('U')" id="btn-U" class="face-btn px-3 py-2 rounded-xl text-xs">
+                <span class="face-indicator" style="background: white; border: 1px solid #666;"></span>UP
+            </button>
+            <button onclick="selectFace('D')" id="btn-D" class="face-btn px-3 py-2 rounded-xl text-xs">
+                <span class="face-indicator" style="background: #FFD500;"></span>DOWN
+            </button>
+            <button onclick="selectFace('F')" id="btn-F" class="face-btn px-3 py-2 rounded-xl text-xs active">
+                <span class="face-indicator" style="background: #16A34A;"></span>FRONT
+            </button>
+            <button onclick="selectFace('B')" id="btn-B" class="face-btn px-3 py-2 rounded-xl text-xs">
+                <span class="face-indicator" style="background: #2563EB;"></span>BACK
+            </button>
+            <button onclick="selectFace('L')" id="btn-L" class="face-btn px-3 py-2 rounded-xl text-xs">
+                <span class="face-indicator" style="background: #F97316;"></span>LEFT
+            </button>
+            <button onclick="selectFace('R')" id="btn-R" class="face-btn px-3 py-2 rounded-xl text-xs">
+                <span class="face-indicator" style="background: #DC2626;"></span>RIGHT
+            </button>
         </div>
         
         <p class="text-center text-xs text-gray-400 font-medium" id="instruction-text">
-            Toque nos quadrados para colorir a face FRONT
+            Toque nos quadrados para colorir a face FRONT (Verde)
         </p>
     </div>
 
@@ -191,8 +212,8 @@
             <button onclick="selectColor('yellow')" id="color-yellow" class="color-btn w-10 h-10 rounded-xl bg-yellow-400" title="Amarelo (D)"></button>
             <button onclick="selectColor('red')" id="color-red" class="color-btn w-10 h-10 rounded-xl bg-red-500" title="Vermelho (R)"></button>
             <button onclick="selectColor('orange')" id="color-orange" class="color-btn w-10 h-10 rounded-xl bg-orange-500" title="Laranja (L)"></button>
-            <button onclick="selectColor('blue')" id="color-blue" class="color-btn w-10 h-10 rounded-xl bg-blue-500" title="Azul (F)"></button>
-            <button onclick="selectColor('green')" id="color-green" class="color-btn w-10 h-10 rounded-xl bg-green-500" title="Verde (B)"></button>
+            <button onclick="selectColor('green')" id="color-green" class="color-btn w-10 h-10 rounded-xl bg-green-500" title="Verde (F)"></button>
+            <button onclick="selectColor('blue')" id="color-blue" class="color-btn w-10 h-10 rounded-xl bg-blue-500" title="Azul (B)"></button>
         </div>
 
         <!-- Action Buttons -->
@@ -317,11 +338,22 @@
         let solution = [], currentMoveIndex = 0, isPlaying = false, playInterval;
         let isAnimating = false;
         const faces = ['U', 'D', 'F', 'B', 'L', 'R'];
+        
+        // CORES CORRETAS DOS CENTROS: U-Branco, D-Amarelo, F-Verde, B-Azul, L-Laranja, R-Vermelho
+        const faceColors = {
+            'U': 'white',
+            'D': 'yellow', 
+            'F': 'green',
+            'B': 'blue',
+            'L': 'orange',
+            'R': 'red'
+        };
+        
         const colors = {
             'white': 0xFFFFFF, 'yellow': 0xFFD500, 'red': 0xDC2626,
             'orange': 0xF97316, 'blue': 0x2563EB, 'green': 0x16A34A, 'gray': 0x374151
         };
-        const colorMap = {'white': 'U', 'yellow': 'D', 'red': 'R', 'orange': 'L', 'blue': 'F', 'green': 'B', 'gray': 'X'};
+        const colorMap = {'white': 'U', 'yellow': 'D', 'red': 'R', 'orange': 'L', 'blue': 'B', 'green': 'F', 'gray': 'X'};
         const solver = new SimpleSolver();
 
         // CONTROLES DE ROTAÇÃO LIVRE
@@ -331,9 +363,16 @@
         let isTouching = false;
         let touchStartTime = 0;
         let touchStartPos = { x: 0, y: 0 };
+        let lastTouchPos = { x: 0, y: 0 };
+        let hasMoved = false;
 
         function init() {
-            faces.forEach(f => cubeState[f] = Array(9).fill('gray'));
+            // Inicializar estado do cubo com os CENTROS já coloridos corretamente
+            faces.forEach(face => {
+                cubeState[face] = Array(9).fill('gray');
+                // Index 4 é o centro - já vem colorido
+                cubeState[face][4] = faceColors[face];
+            });
             
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
@@ -363,7 +402,6 @@
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
             
-            // EVENTOS DE MOUSE E TOUCH PARA ROTAÇÃO LIVRE
             setupRotationControls();
             
             animate();
@@ -373,16 +411,14 @@
         function setupRotationControls() {
             const container = document.getElementById('canvas-container');
             
-            // MOUSE EVENTS
             container.addEventListener('mousedown', onMouseDown);
             container.addEventListener('mousemove', onMouseMove);
             container.addEventListener('mouseup', onMouseUp);
             container.addEventListener('mouseleave', onMouseUp);
             
-            // TOUCH EVENTS
             container.addEventListener('touchstart', onTouchStart, {passive: false});
             container.addEventListener('touchmove', onTouchMove, {passive: false});
-            container.addEventListener('touchend', onTouchEnd);
+            container.addEventListener('touchend', onTouchEnd, {passive: false});
             container.addEventListener('touchcancel', onTouchEnd);
         }
 
@@ -390,10 +426,9 @@
             if(isAnimating) return;
             
             isDragging = true;
+            hasMoved = false;
             previousMousePosition = { x: event.clientX, y: event.clientY };
             document.getElementById('canvas-container').classList.add('dragging');
-            
-            // Parar rotação automática ao interagir
             rotationVelocity = { x: 0, y: 0 };
         }
 
@@ -403,23 +438,29 @@
             const deltaX = event.clientX - previousMousePosition.x;
             const deltaY = event.clientY - previousMousePosition.y;
             
-            // Aplicar rotação ao cubo
+            if(Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+                hasMoved = true;
+            }
+            
             const sensitivity = 0.008;
             cubeGroup.rotation.y += deltaX * sensitivity;
             cubeGroup.rotation.x += deltaY * sensitivity;
             
-            // Armazenar velocidade para inércia
             rotationVelocity = { x: deltaY * sensitivity, y: deltaX * sensitivity };
-            
             previousMousePosition = { x: event.clientX, y: event.clientY };
         }
 
-        function onMouseUp() {
+        function onMouseUp(event) {
+            if(!isDragging) return;
+            
             isDragging = false;
             document.getElementById('canvas-container').classList.remove('dragging');
             
-            // Aplicar inércia
-            applyInertia();
+            if(!hasMoved) {
+                handleColorClick(event.clientX, event.clientY);
+            } else {
+                applyInertia();
+            }
         }
 
         function onTouchStart(event) {
@@ -427,35 +468,40 @@
             
             if(event.touches.length === 1) {
                 isTouching = true;
+                hasMoved = false;
                 touchStartTime = Date.now();
-                touchStartPos = { 
-                    x: event.touches[0].clientX, 
-                    y: event.touches[0].clientY 
-                };
+                
+                const touch = event.touches[0];
+                touchStartPos = { x: touch.clientX, y: touch.clientY };
+                lastTouchPos = { ...touchStartPos };
                 previousMousePosition = { ...touchStartPos };
                 
-                // Verificar se é toque em sticker (colorir) ou rotação
-                // Aguardar touchmove para decidir
-            } else if(event.touches.length === 2) {
-                // Zoom com dois dedos (pinch) - pode ser implementado futuramente
-                event.preventDefault();
+                if(event.target.closest('.cube-container')) {
+                    event.preventDefault();
+                }
             }
         }
 
         function onTouchMove(event) {
             if(!isTouching || isAnimating) return;
             
-            event.preventDefault(); // Prevenir scroll da página
-            
             if(event.touches.length === 1) {
                 const touch = event.touches[0];
                 const deltaX = touch.clientX - previousMousePosition.x;
                 const deltaY = touch.clientY - previousMousePosition.y;
                 
-                // Se moveu mais de 10px, considera como rotação
-                const moveDistance = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
+                const moveDistance = Math.sqrt(
+                    Math.pow(touch.clientX - touchStartPos.x, 2) + 
+                    Math.pow(touch.clientY - touchStartPos.y, 2)
+                );
                 
                 if(moveDistance > 5) {
+                    hasMoved = true;
+                }
+                
+                if(hasMoved) {
+                    event.preventDefault();
+                    
                     const sensitivity = 0.012;
                     cubeGroup.rotation.y += deltaX * sensitivity;
                     cubeGroup.rotation.x += deltaY * sensitivity;
@@ -463,6 +509,7 @@
                     rotationVelocity = { x: deltaY * sensitivity, y: deltaX * sensitivity };
                 }
                 
+                lastTouchPos = { x: touch.clientX, y: touch.clientY };
                 previousMousePosition = { x: touch.clientX, y: touch.clientY };
             }
         }
@@ -470,30 +517,28 @@
         function onTouchEnd(event) {
             if(!isTouching) return;
             
-            const touchDuration = Date.now() - touchStartTime;
-            const touchEndPos = event.changedTouches[0];
-            const moveDistance = Math.sqrt(
-                Math.pow(touchEndPos.clientX - touchStartPos.x, 2) + 
-                Math.pow(touchEndPos.clientY - touchStartPos.y, 2)
-            );
+            isTouching = false;
             
-            // Se foi um toque curto e sem movimento, tratar como clique para colorir
-            if(touchDuration < 200 && moveDistance < 10) {
-                handleColorClick(touchEndPos);
+            if(!hasMoved) {
+                handleColorClick(touchStartPos.x, touchStartPos.y);
             } else {
-                // Foi uma rotação, aplicar inércia
                 applyInertia();
             }
-            
-            isTouching = false;
         }
 
-        function handleColorClick(touch) {
+        function handleColorClick(clientX, clientY) {
+            if(isAnimating) return;
+            
             const container = document.getElementById('canvas-container');
             const rect = container.getBoundingClientRect();
             
-            mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+            if(clientX < rect.left || clientX > rect.right || 
+               clientY < rect.top || clientY > rect.bottom) {
+                return;
+            }
+            
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
             
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(stickers);
@@ -505,14 +550,22 @@
                 const face = sticker.userData.face;
                 const index = sticker.userData.index;
                 
+                // Não permitir colorir o centro (index 4)
+                if(index === 4) {
+                    // Apenas troca para essa face
+                    selectFace(face);
+                    return;
+                }
+                
                 if(face !== currentFace) selectFace(face);
                 
                 cubeState[face][index] = selectedColor;
                 updateCubeColors();
                 
-                // Feedback visual
                 sticker.scale.set(0.9, 0.9, 0.9);
                 setTimeout(() => sticker.scale.set(1, 1, 1), 100);
+                
+                console.log(`Coloriu ${face}[${index}] com ${selectedColor}`);
             }
         }
 
@@ -613,7 +666,14 @@
             document.querySelectorAll('.face-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${face}`).classList.add('active');
             
-            const faceNames = {U: 'UP (Branco)', D: 'DOWN (Amarelo)', F: 'FRONT (Azul)', B: 'BACK (Verde)', L: 'LEFT (Laranja)', R: 'RIGHT (Vermelho)'};
+            const faceNames = {
+                'U': 'UP (Branco)', 
+                'D': 'DOWN (Amarelo)', 
+                'F': 'FRONT (Verde)', 
+                'B': 'BACK (Azul)', 
+                'L': 'LEFT (Laranja)', 
+                'R': 'RIGHT (Vermelho)'
+            };
             document.getElementById('instruction-text').textContent = `Toque para colorir: ${faceNames[face]}`;
             
             const targetRotations = {
@@ -648,12 +708,15 @@
 
         function resetCube() {
             stopPlay();
-            faces.forEach(f => cubeState[f] = Array(9).fill('gray'));
+            // Resetar mantendo os centros coloridos
+            faces.forEach(face => {
+                cubeState[face] = Array(9).fill('gray');
+                cubeState[face][4] = faceColors[face]; // Centro permanece
+            });
             updateCubeColors();
             hideSolution();
-            updateStatus('Cubo resetado');
+            updateStatus('Cubo resetado - centros mantidos');
             
-            // Resetar rotação com animação suave
             const start = {x: cubeGroup.rotation.x, y: cubeGroup.rotation.y};
             const startTime = Date.now();
             const duration = 500;
@@ -673,10 +736,14 @@
 
         function randomizeCube() {
             stopPlay();
-            const colorList = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
+            const colorList = ['white', 'yellow', 'red', 'orange', 'green', 'blue'];
+            // Embaralhar mantendo a relação correta das cores
             const shuffled = [...colorList].sort(() => Math.random() - 0.5);
-            faces.forEach((face, idx) => {
-                cubeState[face] = Array(9).fill(shuffled[idx]);
+            const faceMap = {'U': 0, 'D': 1, 'F': 4, 'B': 5, 'L': 3, 'R': 2}; // Índices no colorList
+            
+            faces.forEach((face) => {
+                const colorIndex = faceMap[face];
+                cubeState[face] = Array(9).fill(shuffled[colorIndex]);
             });
             updateCubeColors();
             hideSolution();
@@ -684,14 +751,17 @@
         }
 
         function validateCube() {
+            // Verificar se todas as faces estão completas (exceto centros que já estão ok)
             for(let face of faces) {
                 for(let i = 0; i < 9; i++) {
+                    if(i === 4) continue; // Pular centro que já está correto
                     if(cubeState[face][i] === 'gray') {
                         return {valid: false, message: `Face ${face} incompleta!`};
                     }
                 }
             }
             
+            // Verificar se tem exatamente 9 de cada cor
             const colorCount = {};
             faces.forEach(face => {
                 cubeState[face].forEach(color => {
@@ -699,8 +769,9 @@
                 });
             });
             
-            const expected = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
-            for(let color of expected) {
+            // Todas as 6 cores devem ter exatamente 9 stickers
+            const expectedColors = ['white', 'yellow', 'red', 'orange', 'green', 'blue'];
+            for(let color of expectedColors) {
                 if(colorCount[color] !== 9) {
                     return {valid: false, message: `Cor ${color} deve ter 9 stickers!`};
                 }
@@ -967,16 +1038,13 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // Rotação automática suave apenas quando não interagindo
             if(!isDragging && !isTouching && !isAnimating && !isPlaying && cubeGroup) {
-                // Aplicar inércia se houver
                 if(Math.abs(rotationVelocity.x) > 0.001 || Math.abs(rotationVelocity.y) > 0.001) {
                     cubeGroup.rotation.x += rotationVelocity.x;
                     cubeGroup.rotation.y += rotationVelocity.y;
                     rotationVelocity.x *= 0.95;
                     rotationVelocity.y *= 0.95;
                 } else {
-                    // Rotação idle muito suave
                     cubeGroup.rotation.y += 0.0002;
                 }
             }
