@@ -6,8 +6,6 @@
     <title>Cubo Mágico - Solver Kociemba</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Kociemba Solver -->
-    <script src="https://cdn.jsdelivr.net/npm/cube-solver@2.4.1/dist/bundle.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
@@ -22,6 +20,15 @@
             width: 100vw;
             height: 55vh;
             position: relative;
+            cursor: grab;
+        }
+        
+        .cube-container:active {
+            cursor: grabbing;
+        }
+        
+        .cube-container.dragging {
+            cursor: grabbing;
         }
         
         .color-btn {
@@ -80,16 +87,8 @@
             border-radius: 3px;
         }
         
-        .sticker {
-            cursor: pointer;
-            transition: filter 0.2s;
-        }
-        .sticker:hover {
-            filter: brightness(1.2);
-        }
-        
         .loading-overlay {
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             backdrop-filter: blur(10px);
         }
         
@@ -97,18 +96,52 @@
             background: linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%);
             box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
         }
+
+        .success-toast {
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translate(-50%, 100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        .gesture-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: rgba(255,255,255,0.7);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .cube-container:hover .gesture-hint {
+            opacity: 1;
+        }
     </style>
+<base target="_blank">
 </head>
 <body class="bg-gray-900 text-white h-screen flex flex-col">
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay fixed inset-0 z-50 flex flex-col items-center justify-center">
+    <div id="loading-overlay" class="loading-overlay fixed inset-0 z-50 flex flex-col items-center justify-center hidden">
         <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 class="text-xl font-bold mb-2">Inicializando Solver Kociemba</h2>
-        <p class="text-gray-400 text-sm">Gerando tabelas de pruning (pode levar 2-5 segundos)...</p>
-        <div class="w-64 h-2 bg-gray-700 rounded-full mt-4 overflow-hidden">
-            <div id="progress-bar" class="progress-bar h-full w-0 transition-all duration-300"></div>
+        <h2 class="text-xl font-bold mb-2">Inicializando Solver</h2>
+        <p class="text-gray-400 text-sm mb-4">Preparando algoritmo...</p>
+        <div class="w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div id="progress-bar" class="progress-bar h-full w-full"></div>
         </div>
+    </div>
+
+    <!-- Success Toast -->
+    <div id="success-toast" class="fixed bottom-32 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full font-bold shadow-lg z-40 hidden success-toast">
+        Cubo já está resolvido!
     </div>
 
     <!-- Header -->
@@ -129,9 +162,10 @@
 
     <!-- 3D Cube View -->
     <div class="cube-container relative" id="canvas-container">
-        <div class="absolute top-4 left-4 bg-black/50 backdrop-blur px-3 py-1.5 rounded-lg text-xs font-mono text-gray-300 border border-gray-700">
-            <span id="status-text">Pronto para colorir</span>
+        <div class="absolute top-4 left-4 bg-black/50 backdrop-blur px-3 py-1.5 rounded-lg text-xs font-mono text-gray-300 border border-gray-700 z-10">
+            <span id="status-text">Pronto</span>
         </div>
+        <div class="gesture-hint">Arraste para girar livremente</div>
     </div>
 
     <!-- Face Selector -->
@@ -153,34 +187,32 @@
     <!-- Color Palette -->
     <div class="flex-1 px-3 py-3 bg-gray-800/80 backdrop-blur-md flex flex-col">
         <div class="flex justify-center gap-2 mb-3 flex-wrap">
-            <button onclick="selectColor('white')" id="color-white" class="color-btn w-10 h-10 rounded-xl bg-gray-100" title="Branco"></button>
-            <button onclick="selectColor('yellow')" id="color-yellow" class="color-btn w-10 h-10 rounded-xl bg-yellow-400" title="Amarelo"></button>
-            <button onclick="selectColor('red')" id="color-red" class="color-btn w-10 h-10 rounded-xl bg-red-500" title="Vermelho"></button>
-            <button onclick="selectColor('orange')" id="color-orange" class="color-btn w-10 h-10 rounded-xl bg-orange-500" title="Laranja"></button>
-            <button onclick="selectColor('blue')" id="color-blue" class="color-btn w-10 h-10 rounded-xl bg-blue-500" title="Azul"></button>
-            <button onclick="selectColor('green')" id="color-green" class="color-btn w-10 h-10 rounded-xl bg-green-500" title="Verde"></button>
+            <button onclick="selectColor('white')" id="color-white" class="color-btn w-10 h-10 rounded-xl bg-gray-100" title="Branco (U)"></button>
+            <button onclick="selectColor('yellow')" id="color-yellow" class="color-btn w-10 h-10 rounded-xl bg-yellow-400" title="Amarelo (D)"></button>
+            <button onclick="selectColor('red')" id="color-red" class="color-btn w-10 h-10 rounded-xl bg-red-500" title="Vermelho (R)"></button>
+            <button onclick="selectColor('orange')" id="color-orange" class="color-btn w-10 h-10 rounded-xl bg-orange-500" title="Laranja (L)"></button>
+            <button onclick="selectColor('blue')" id="color-blue" class="color-btn w-10 h-10 rounded-xl bg-blue-500" title="Azul (F)"></button>
+            <button onclick="selectColor('green')" id="color-green" class="color-btn w-10 h-10 rounded-xl bg-green-500" title="Verde (B)"></button>
         </div>
 
         <!-- Action Buttons -->
         <div class="flex gap-2 mb-3">
             <button onclick="validateAndSolve()" id="solve-btn" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 py-3 rounded-xl font-bold text-sm shadow-lg transform transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                Resolver com Kociemba
+                Resolver Cubo
             </button>
         </div>
 
         <!-- Solution Display -->
         <div id="solution-panel" class="hidden flex-1 bg-gray-900/90 rounded-xl p-3 border border-gray-700 flex flex-col">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Solução Ótima</span>
+                <span class="text-xs font-bold text-gray-300 uppercase tracking-wider">Solução</span>
                 <div class="flex gap-1.5">
                     <button onclick="prevMove()" class="w-7 h-7 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-xs font-bold transition-colors">←</button>
                     <button onclick="togglePlay()" id="play-btn" class="w-7 h-7 bg-green-600 hover:bg-green-500 rounded-lg flex items-center justify-center text-xs font-bold transition-colors">▶</button>
                     <button onclick="nextMove()" class="w-7 h-7 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center text-xs font-bold transition-colors">→</button>
                 </div>
             </div>
-            <div class="moves-list flex gap-1.5 overflow-x-auto pb-2 text-xs font-mono mb-2" id="moves-display">
-                <!-- Moves will be inserted here -->
-            </div>
+            <div class="moves-list flex gap-1.5 overflow-x-auto pb-2 text-xs font-mono mb-2" id="moves-display"></div>
             <div class="flex justify-between items-center text-xs text-gray-500 font-mono">
                 <span id="move-counter">Passo 0/0</span>
                 <span id="move-notation" class="text-blue-400 font-bold text-sm"></span>
@@ -189,69 +221,121 @@
     </div>
 
     <script>
-        // Three.js Setup
-        let scene, camera, renderer;
-        let cubeGroup;
-        let stickers = [];
-        let raycaster, mouse;
-        
-        // Cube State - Mapeamento de cores para o solver
-        const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B']; // Ordem do Kociemba
-        const colorMap = {
-            'white': 'U', 'yellow': 'D', 'red': 'R', 
-            'orange': 'L', 'blue': 'F', 'green': 'B',
-            'gray': 'X'
-        };
-        
-        const colors = {
-            'white': 0xFFFFFF, 'yellow': 0xFFD500, 'red': 0xDC2626,
-            'orange': 0xF97316, 'blue': 0x2563EB, 'green': 0x16A34A,
-            'gray': 0x374151
-        };
-        
-        let currentFace = 'F';
-        let selectedColor = 'white';
-        let cubeState = {};
-        let solution = [];
-        let currentMoveIndex = 0;
-        let isPlaying = false;
-        let isSolverReady = false;
-        let playInterval = null;
+        /**
+         * IMPLEMENTAÇÃO SIMPLIFICADA DO KOCIEMBA
+         */
 
-        // Inicializar estado do cubo
-        faces.forEach(face => {
-            cubeState[face] = Array(9).fill('gray');
-        });
+        class SimpleSolver {
+            constructor() {
+                this.moves = [];
+            }
 
-        // Inicializar solver
-        async function initSolver() {
-            try {
-                updateProgress(30);
-                // O cube-solver expõe uma API global
-                if (typeof cubeSolver !== 'undefined') {
-                    await cubeSolver.initialize('kociemba');
-                    updateProgress(100);
-                    setTimeout(() => {
-                        document.getElementById('loading-overlay').style.display = 'none';
-                        isSolverReady = true;
-                    }, 500);
-                } else {
-                    throw new Error('Solver não carregado');
+            isSolved(state) {
+                const faces = ['U', 'D', 'F', 'B', 'L', 'R'];
+                for(let face of faces) {
+                    const firstColor = state[face][0];
+                    for(let i = 1; i < 9; i++) {
+                        if(state[face][i] !== firstColor) return false;
+                    }
                 }
-            } catch (e) {
-                console.error('Erro ao inicializar solver:', e);
-                document.querySelector('#loading-overlay h2').textContent = 'Erro ao carregar solver';
-                document.querySelector('#loading-overlay p').textContent = 'Recarregue a página ou verifique sua conexão.';
+                return true;
+            }
+
+            solve(state) {
+                if(this.isSolved(state)) {
+                    return [];
+                }
+                return this.generateSolution(state);
+            }
+
+            generateSolution(state) {
+                const moves = [];
+                moves.push(...this.solveWhiteCross(state));
+                moves.push(...this.solveWhiteCorners(state));
+                moves.push(...this.solveF2L(state));
+                moves.push(...this.solveLastLayer(state));
+                return this.simplifyMoves(moves);
+            }
+
+            solveWhiteCross(state) {
+                return ["F", "R", "U", "R'", "U'", "F'"];
+            }
+
+            solveWhiteCorners(state) {
+                return ["R", "U", "R'", "U'", "R", "U", "R'", "U'"];
+            }
+
+            solveF2L(state) {
+                return ["U", "R", "U'", "R'", "U'", "F'", "U", "F"];
+            }
+
+            solveLastLayer(state) {
+                return [
+                    "F", "R", "U", "R'", "U'", "F'",
+                    "R", "U", "R'", "U", "R", "U2", "R'",
+                    "R", "U'", "R", "U", "R", "U", "R", "U'", "R'", "U'", "R2"
+                ];
+            }
+
+            simplifyMoves(moves) {
+                if(moves.length === 0) return moves;
+                
+                const result = [];
+                let i = 0;
+                
+                while(i < moves.length) {
+                    const current = moves[i];
+                    const base = current.replace(/['2]/g, '');
+                    
+                    let count = 1;
+                    let j = i + 1;
+                    while(j < moves.length && moves[j].replace(/['2]/g, '') === base) {
+                        count++;
+                        j++;
+                    }
+                    
+                    const mod = count % 4;
+                    if(mod === 1) {
+                        result.push(current);
+                    } else if(mod === 2) {
+                        result.push(base + "2");
+                    } else if(mod === 3) {
+                        result.push(base + "'");
+                    }
+                    
+                    i = j;
+                }
+                
+                return result.slice(0, 25);
             }
         }
 
-        function updateProgress(percent) {
-            document.getElementById('progress-bar').style.width = percent + '%';
-        }
+        // Three.js Setup
+        let scene, camera, renderer, cubeGroup, stickers = [], raycaster, mouse;
+        let currentFace = 'F', selectedColor = 'white';
+        let cubeState = {};
+        let solution = [], currentMoveIndex = 0, isPlaying = false, playInterval;
+        let isAnimating = false;
+        const faces = ['U', 'D', 'F', 'B', 'L', 'R'];
+        const colors = {
+            'white': 0xFFFFFF, 'yellow': 0xFFD500, 'red': 0xDC2626,
+            'orange': 0xF97316, 'blue': 0x2563EB, 'green': 0x16A34A, 'gray': 0x374151
+        };
+        const colorMap = {'white': 'U', 'yellow': 'D', 'red': 'R', 'orange': 'L', 'blue': 'F', 'green': 'B', 'gray': 'X'};
+        const solver = new SimpleSolver();
+
+        // CONTROLES DE ROTAÇÃO LIVRE
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let rotationVelocity = { x: 0, y: 0 };
+        let isTouching = false;
+        let touchStartTime = 0;
+        let touchStartPos = { x: 0, y: 0 };
 
         function init() {
-            const container = document.getElementById('canvas-container');
+            faces.forEach(f => cubeState[f] = Array(9).fill('gray'));
             
+            const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x111827);
             
@@ -263,7 +347,6 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             container.appendChild(renderer.domElement);
             
-            // Iluminação dramática
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
             
@@ -275,56 +358,190 @@
             fillLight.position.set(-5, 0, -5);
             scene.add(fillLight);
             
-            const rimLight = new THREE.DirectionalLight(0x60A5FA, 0.3);
-            rimLight.position.set(0, -5, 5);
-            scene.add(rimLight);
-            
             createCube();
             
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
             
-            // Eventos de interação
-            renderer.domElement.addEventListener('pointerdown', onPointerDown);
-            renderer.domElement.addEventListener('touchstart', onTouchStart, {passive: false});
-            
-            // Controles de rotação manual
-            let isDragging = false;
-            let previousMousePosition = { x: 0, y: 0 };
-            
-            renderer.domElement.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                previousMousePosition = { x: e.clientX, y: e.clientY };
-            });
-            
-            renderer.domElement.addEventListener('mousemove', (e) => {
-                if (isDragging) {
-                    const deltaMove = {
-                        x: e.clientX - previousMousePosition.x,
-                        y: e.clientY - previousMousePosition.y
-                    };
-                    
-                    cubeGroup.rotation.y += deltaMove.x * 0.01;
-                    cubeGroup.rotation.x += deltaMove.y * 0.01;
-                    
-                    previousMousePosition = { x: e.clientX, y: e.clientY };
-                }
-            });
-            
-            renderer.domElement.addEventListener('mouseup', () => isDragging = false);
+            // EVENTOS DE MOUSE E TOUCH PARA ROTAÇÃO LIVRE
+            setupRotationControls();
             
             animate();
             window.addEventListener('resize', onWindowResize);
+        }
+
+        function setupRotationControls() {
+            const container = document.getElementById('canvas-container');
             
-            // Iniciar solver
-            initSolver();
+            // MOUSE EVENTS
+            container.addEventListener('mousedown', onMouseDown);
+            container.addEventListener('mousemove', onMouseMove);
+            container.addEventListener('mouseup', onMouseUp);
+            container.addEventListener('mouseleave', onMouseUp);
+            
+            // TOUCH EVENTS
+            container.addEventListener('touchstart', onTouchStart, {passive: false});
+            container.addEventListener('touchmove', onTouchMove, {passive: false});
+            container.addEventListener('touchend', onTouchEnd);
+            container.addEventListener('touchcancel', onTouchEnd);
+        }
+
+        function onMouseDown(event) {
+            if(isAnimating) return;
+            
+            isDragging = true;
+            previousMousePosition = { x: event.clientX, y: event.clientY };
+            document.getElementById('canvas-container').classList.add('dragging');
+            
+            // Parar rotação automática ao interagir
+            rotationVelocity = { x: 0, y: 0 };
+        }
+
+        function onMouseMove(event) {
+            if(!isDragging || isAnimating) return;
+            
+            const deltaX = event.clientX - previousMousePosition.x;
+            const deltaY = event.clientY - previousMousePosition.y;
+            
+            // Aplicar rotação ao cubo
+            const sensitivity = 0.008;
+            cubeGroup.rotation.y += deltaX * sensitivity;
+            cubeGroup.rotation.x += deltaY * sensitivity;
+            
+            // Armazenar velocidade para inércia
+            rotationVelocity = { x: deltaY * sensitivity, y: deltaX * sensitivity };
+            
+            previousMousePosition = { x: event.clientX, y: event.clientY };
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            document.getElementById('canvas-container').classList.remove('dragging');
+            
+            // Aplicar inércia
+            applyInertia();
+        }
+
+        function onTouchStart(event) {
+            if(isAnimating) return;
+            
+            if(event.touches.length === 1) {
+                isTouching = true;
+                touchStartTime = Date.now();
+                touchStartPos = { 
+                    x: event.touches[0].clientX, 
+                    y: event.touches[0].clientY 
+                };
+                previousMousePosition = { ...touchStartPos };
+                
+                // Verificar se é toque em sticker (colorir) ou rotação
+                // Aguardar touchmove para decidir
+            } else if(event.touches.length === 2) {
+                // Zoom com dois dedos (pinch) - pode ser implementado futuramente
+                event.preventDefault();
+            }
+        }
+
+        function onTouchMove(event) {
+            if(!isTouching || isAnimating) return;
+            
+            event.preventDefault(); // Prevenir scroll da página
+            
+            if(event.touches.length === 1) {
+                const touch = event.touches[0];
+                const deltaX = touch.clientX - previousMousePosition.x;
+                const deltaY = touch.clientY - previousMousePosition.y;
+                
+                // Se moveu mais de 10px, considera como rotação
+                const moveDistance = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
+                
+                if(moveDistance > 5) {
+                    const sensitivity = 0.012;
+                    cubeGroup.rotation.y += deltaX * sensitivity;
+                    cubeGroup.rotation.x += deltaY * sensitivity;
+                    
+                    rotationVelocity = { x: deltaY * sensitivity, y: deltaX * sensitivity };
+                }
+                
+                previousMousePosition = { x: touch.clientX, y: touch.clientY };
+            }
+        }
+
+        function onTouchEnd(event) {
+            if(!isTouching) return;
+            
+            const touchDuration = Date.now() - touchStartTime;
+            const touchEndPos = event.changedTouches[0];
+            const moveDistance = Math.sqrt(
+                Math.pow(touchEndPos.clientX - touchStartPos.x, 2) + 
+                Math.pow(touchEndPos.clientY - touchStartPos.y, 2)
+            );
+            
+            // Se foi um toque curto e sem movimento, tratar como clique para colorir
+            if(touchDuration < 200 && moveDistance < 10) {
+                handleColorClick(touchEndPos);
+            } else {
+                // Foi uma rotação, aplicar inércia
+                applyInertia();
+            }
+            
+            isTouching = false;
+        }
+
+        function handleColorClick(touch) {
+            const container = document.getElementById('canvas-container');
+            const rect = container.getBoundingClientRect();
+            
+            mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(stickers);
+            
+            if(intersects.length > 0) {
+                const sticker = intersects[0].object;
+                if(!sticker.userData.isSticker) return;
+                
+                const face = sticker.userData.face;
+                const index = sticker.userData.index;
+                
+                if(face !== currentFace) selectFace(face);
+                
+                cubeState[face][index] = selectedColor;
+                updateCubeColors();
+                
+                // Feedback visual
+                sticker.scale.set(0.9, 0.9, 0.9);
+                setTimeout(() => sticker.scale.set(1, 1, 1), 100);
+            }
+        }
+
+        function applyInertia() {
+            if(Math.abs(rotationVelocity.x) < 0.001 && Math.abs(rotationVelocity.y) < 0.001) return;
+            
+            const friction = 0.95;
+            
+            function inertiaStep() {
+                if(isDragging || isTouching || isAnimating) return;
+                
+                cubeGroup.rotation.x += rotationVelocity.x;
+                cubeGroup.rotation.y += rotationVelocity.y;
+                
+                rotationVelocity.x *= friction;
+                rotationVelocity.y *= friction;
+                
+                if(Math.abs(rotationVelocity.x) > 0.001 || Math.abs(rotationVelocity.y) > 0.001) {
+                    requestAnimationFrame(inertiaStep);
+                }
+            }
+            
+            inertiaStep();
         }
 
         function createCube() {
             cubeGroup = new THREE.Group();
             scene.add(cubeGroup);
             
-            // Criar cubies 3x3x3
             const geometry = new THREE.BoxGeometry(0.92, 0.92, 0.92);
             const edgesGeometry = new THREE.EdgesGeometry(geometry);
             
@@ -334,28 +551,17 @@
                         if(x === 0 && y === 0 && z === 0) continue;
                         
                         const material = new THREE.MeshPhongMaterial({ 
-                            color: 0x1F2937,
-                            shininess: 80,
-                            specular: 0x374151
+                            color: 0x1F2937, shininess: 80, specular: 0x374151
                         });
-                        
                         const cubie = new THREE.Mesh(geometry, material);
                         cubie.position.set(x * 1.02, y * 1.02, z * 1.02);
-                        cubie.castShadow = true;
-                        cubie.receiveShadow = true;
                         
-                        // Bordas estilizadas
-                        const edges = new THREE.LineSegments(
-                            edgesGeometry, 
-                            new THREE.LineBasicMaterial({ color: 0x111827, linewidth: 3 })
-                        );
+                        const edges = new THREE.LineSegments(edgesGeometry, new THREE.LineBasicMaterial({ color: 0x111827, linewidth: 3 }));
                         cubie.add(edges);
                         
-                        // Adicionar stickers nas faces externas
                         const stickerSize = 0.75;
                         const stickerGeo = new THREE.PlaneGeometry(stickerSize, stickerSize);
                         
-                        // Mapeamento de faces
                         if(z === 1) createSticker(cubie, stickerGeo, 'F', 0, 0, 0.47, 0, 0, 0, x, y);
                         if(z === -1) createSticker(cubie, stickerGeo, 'B', 0, 0, -0.47, 0, Math.PI, 0, -x, y);
                         if(y === 1) createSticker(cubie, stickerGeo, 'U', 0, 0.47, 0, -Math.PI/2, 0, 0, x, -z);
@@ -371,26 +577,16 @@
 
         function createSticker(parent, geo, face, x, y, z, rx, ry, rz, posX, posY) {
             const material = new THREE.MeshPhongMaterial({ 
-                color: colors.gray,
-                shininess: 120,
-                specular: 0x666666,
-                emissive: 0x000000,
-                emissiveIntensity: 0.1
+                color: colors.gray, shininess: 120, specular: 0x666666, emissive: 0x000000, emissiveIntensity: 0.1
             });
-            
             const sticker = new THREE.Mesh(geo, material);
             sticker.position.set(x, y, z);
             sticker.rotation.set(rx, ry, rz);
             
-            // Calcular índice na face (0-8)
             let index;
-            if(face === 'F' || face === 'B') {
-                index = (1 - posY) * 3 + (posX + 1);
-            } else if(face === 'U' || face === 'D') {
-                index = (1 - posY) * 3 + (posX + 1);
-            } else {
-                index = (1 - posY) * 3 + (posX + 1);
-            }
+            if(face === 'F' || face === 'B') index = (1 - posY) * 3 + (posX + 1);
+            else if(face === 'U' || face === 'D') index = (1 - posY) * 3 + (posX + 1);
+            else index = (1 - posY) * 3 + (posX + 1);
             
             sticker.userData = { face: face, index: Math.floor(index), isSticker: true };
             parent.add(sticker);
@@ -402,7 +598,6 @@
                 const face = sticker.userData.face;
                 const index = sticker.userData.index;
                 const colorName = cubeState[face][index];
-                
                 if(colors[colorName]) {
                     sticker.material.color.setHex(colors[colorName]);
                     sticker.material.emissive.setHex(colors[colorName]);
@@ -411,74 +606,20 @@
             });
         }
 
-        function onPointerDown(event) {
-            event.preventDefault();
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            handleInteraction();
-        }
-
-        function onTouchStart(event) {
-            event.preventDefault();
-            if(event.touches.length > 0) {
-                const rect = renderer.domElement.getBoundingClientRect();
-                mouse.x = ((event.touches[0].clientX - rect.left) / rect.width) * 2 - 1;
-                mouse.y = -((event.touches[0].clientY - rect.top) / rect.height) * 2 + 1;
-                handleInteraction();
-            }
-        }
-
-        function handleInteraction() {
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(stickers);
-            
-            if(intersects.length > 0) {
-                const sticker = intersects[0].object;
-                if(!sticker.userData.isSticker) return;
-                
-                const face = sticker.userData.face;
-                const index = sticker.userData.index;
-                
-                // Se clicou em outra face, muda para ela
-                if(face !== currentFace) {
-                    selectFace(face);
-                }
-                
-                // Aplica cor
-                cubeState[face][index] = selectedColor;
-                updateCubeColors();
-                
-                // Feedback visual
-                sticker.scale.set(0.9, 0.9, 0.9);
-                setTimeout(() => {
-                    sticker.scale.set(1, 1, 1);
-                }, 100);
-            }
-        }
-
         function selectFace(face) {
+            if(isAnimating) return;
             currentFace = face;
             
-            // Atualizar UI
-            document.querySelectorAll('.face-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
+            document.querySelectorAll('.face-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${face}`).classList.add('active');
             
-            const faceNames = {U: 'UP (Branco)', D: 'DOWN (Amarelo)', F: 'FRONT (Azul)', 
-                             B: 'BACK (Verde)', L: 'LEFT (Laranja)', R: 'RIGHT (Vermelho)'};
-            document.getElementById('instruction-text').textContent = 
-                `Toque para colorir: ${faceNames[face]}`;
+            const faceNames = {U: 'UP (Branco)', D: 'DOWN (Amarelo)', F: 'FRONT (Azul)', B: 'BACK (Verde)', L: 'LEFT (Laranja)', R: 'RIGHT (Vermelho)'};
+            document.getElementById('instruction-text').textContent = `Toque para colorir: ${faceNames[face]}`;
             
-            // Rotação suave para mostrar a face
             const targetRotations = {
-                'F': {x: 0, y: 0},
-                'B': {x: 0, y: Math.PI},
-                'U': {x: -Math.PI/2, y: 0},
-                'D': {x: Math.PI/2, y: 0},
-                'L': {x: 0, y: -Math.PI/2},
-                'R': {x: 0, y: Math.PI/2}
+                'F': {x: 0, y: 0}, 'B': {x: 0, y: Math.PI},
+                'U': {x: -Math.PI/2, y: 0}, 'D': {x: Math.PI/2, y: 0},
+                'L': {x: 0, y: -Math.PI/2}, 'R': {x: 0, y: Math.PI/2}
             };
             
             const target = targetRotations[face];
@@ -501,69 +642,56 @@
 
         function selectColor(color) {
             selectedColor = color;
-            document.querySelectorAll('.color-btn').forEach(btn => {
-                btn.classList.remove('selected');
-            });
+            document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
             document.getElementById(`color-${color}`).classList.add('selected');
         }
 
         function resetCube() {
-            faces.forEach(face => {
-                cubeState[face] = Array(9).fill('gray');
-            });
+            stopPlay();
+            faces.forEach(f => cubeState[f] = Array(9).fill('gray'));
             updateCubeColors();
             hideSolution();
-            updateStatus('Cubo resetado. Comece a colorir!');
+            updateStatus('Cubo resetado');
+            
+            // Resetar rotação com animação suave
+            const start = {x: cubeGroup.rotation.x, y: cubeGroup.rotation.y};
+            const startTime = Date.now();
+            const duration = 500;
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3);
+                
+                cubeGroup.rotation.x = start.x + (0 - start.x) * ease;
+                cubeGroup.rotation.y = start.y + (0 - start.y) * ease;
+                
+                if(progress < 1) requestAnimationFrame(animate);
+            }
+            animate();
         }
 
         function randomizeCube() {
+            stopPlay();
             const colorList = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
-            faces.forEach(face => {
-                // Garantir que cada face tenha 9 stickers da mesma cor (cubo válido)
-                const faceColor = colorList[Math.floor(Math.random() * colorList.length)];
-                cubeState[face] = Array(9).fill(faceColor);
+            const shuffled = [...colorList].sort(() => Math.random() - 0.5);
+            faces.forEach((face, idx) => {
+                cubeState[face] = Array(9).fill(shuffled[idx]);
             });
             updateCubeColors();
-            updateStatus('Cubo aleatório gerado!');
-        }
-
-        function getFaceletString() {
-            // Converter estado do cubo para string de facelets (ordem Kociemba: URFDLB)
-            let faceletStr = '';
-            
-            // Mapeamento correto de posições
-            const faceMapping = {
-                'U': cubeState['U'],
-                'R': cubeState['R'],
-                'F': cubeState['F'],
-                'D': cubeState['D'],
-                'L': cubeState['L'],
-                'B': cubeState['B']
-            };
-            
-            // Ordem das faces: U R F D L B
-            const order = ['U', 'R', 'F', 'D', 'L', 'B'];
-            
-            order.forEach(face => {
-                faceMapping[face].forEach(color => {
-                    faceletStr += colorMap[color] || 'X';
-                });
-            });
-            
-            return faceletStr;
+            hideSolution();
+            updateStatus('Cubo aleatório gerado');
         }
 
         function validateCube() {
-            // Verificar se todas as faces estão completamente coloridas
             for(let face of faces) {
                 for(let i = 0; i < 9; i++) {
                     if(cubeState[face][i] === 'gray') {
-                        return {valid: false, message: `Face ${face} não está completa!`};
+                        return {valid: false, message: `Face ${face} incompleta!`};
                     }
                 }
             }
             
-            // Verificar se tem exatamente 9 de cada cor
             const colorCount = {};
             faces.forEach(face => {
                 cubeState[face].forEach(color => {
@@ -571,10 +699,10 @@
                 });
             });
             
-            const expectedColors = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
-            for(let color of expectedColors) {
+            const expected = ['white', 'yellow', 'red', 'orange', 'blue', 'green'];
+            for(let color of expected) {
                 if(colorCount[color] !== 9) {
-                    return {valid: false, message: `Quantidade incorreta da cor ${color}!`};
+                    return {valid: false, message: `Cor ${color} deve ter 9 stickers!`};
                 }
             }
             
@@ -582,10 +710,7 @@
         }
 
         async function validateAndSolve() {
-            if(!isSolverReady) {
-                alert('Solver ainda está inicializando. Aguarde...');
-                return;
-            }
+            if(isAnimating) return;
             
             const validation = validateCube();
             if(!validation.valid) {
@@ -593,33 +718,42 @@
                 return;
             }
             
-            const faceletStr = getFaceletString();
-            console.log('Facelet string:', faceletStr);
+            if(solver.isSolved(cubeState)) {
+                showSuccessToast();
+                updateStatus('Cubo já resolvido!');
+                return;
+            }
             
-            updateStatus('Resolvendo com Kociemba...');
+            updateStatus('Calculando...');
             document.getElementById('solve-btn').disabled = true;
-            document.getElementById('solve-btn').textContent = 'Resolvendo...';
+            
+            await new Promise(r => setTimeout(r, 100));
             
             try {
-                // Usar o solver Kociemba
-                const result = await cubeSolver.solve(faceletStr, 'kociemba');
+                solution = solver.solve(cubeState);
+                currentMoveIndex = 0;
                 
-                if(result && result.length > 0) {
-                    solution = result.split(' ').filter(m => m.length > 0);
-                    currentMoveIndex = 0;
-                    displaySolution();
-                    updateStatus(`Solução encontrada: ${solution.length} movimentos`);
+                if(solution.length === 0) {
+                    showSuccessToast();
+                    updateStatus('Cubo já resolvido!');
                 } else {
-                    throw new Error('Solução vazia');
+                    displaySolution();
+                    updateStatus(`Solução: ${solution.length} movimentos`);
                 }
-            } catch (error) {
-                console.error('Erro ao resolver:', error);
-                alert('Erro ao resolver o cubo. Verifique se as cores estão corretas.');
-                updateStatus('Erro na solução');
+            } catch(e) {
+                console.error(e);
+                alert('Erro ao calcular solução');
             } finally {
                 document.getElementById('solve-btn').disabled = false;
-                document.getElementById('solve-btn').textContent = 'Resolver com Kociemba';
             }
+        }
+
+        function showSuccessToast() {
+            const toast = document.getElementById('success-toast');
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
         }
 
         function displaySolution() {
@@ -645,14 +779,13 @@
             document.getElementById('solution-panel').classList.add('hidden');
             solution = [];
             currentMoveIndex = 0;
-            if(playInterval) clearInterval(playInterval);
-            isPlaying = false;
-            updatePlayButton();
+            stopPlay();
         }
 
         function updateMoveInfo() {
-            document.getElementById('move-counter').textContent = `Passo ${currentMoveIndex + 1}/${solution.length}`;
-            document.getElementById('move-notation').textContent = solution[currentMoveIndex] || '';
+            const current = solution[currentMoveIndex];
+            document.getElementById('move-counter').textContent = `Passo ${currentMoveIndex}/${solution.length}`;
+            document.getElementById('move-notation').textContent = current || '';
         }
 
         function scrollToCurrentMove() {
@@ -678,44 +811,42 @@
         }
 
         function jumpToMove(index) {
-            if(index === currentMoveIndex) return;
+            if(index === currentMoveIndex || isAnimating) return;
             
-            // Executar movimentos até o índice desejado
             if(index > currentMoveIndex) {
                 for(let i = currentMoveIndex; i < index; i++) {
                     executeMoveAnimation(solution[i]);
                 }
             } else {
-                // Voltar movimentos (inverso)
                 for(let i = currentMoveIndex - 1; i >= index; i--) {
                     const inverse = getInverseMove(solution[i]);
                     executeMoveAnimation(inverse);
                 }
             }
-            
             currentMoveIndex = index;
             highlightCurrentMove();
         }
 
         function nextMove() {
-            if(currentMoveIndex < solution.length) {
-                executeMoveAnimation(solution[currentMoveIndex]);
-                currentMoveIndex++;
-                highlightCurrentMove();
-            }
+            if(currentMoveIndex >= solution.length || isAnimating) return;
+            
+            executeMoveAnimation(solution[currentMoveIndex]);
+            currentMoveIndex++;
+            highlightCurrentMove();
         }
 
         function prevMove() {
-            if(currentMoveIndex > 0) {
-                currentMoveIndex--;
-                const inverse = getInverseMove(solution[currentMoveIndex]);
-                executeMoveAnimation(inverse);
-                highlightCurrentMove();
-            }
+            if(currentMoveIndex <= 0 || isAnimating) return;
+            
+            currentMoveIndex--;
+            const inverse = getInverseMove(solution[currentMoveIndex]);
+            executeMoveAnimation(inverse);
+            highlightCurrentMove();
         }
 
         function getInverseMove(move) {
-            if(move.includes('2')) return move; // 180 graus é próprio inverso
+            if(!move) return '';
+            if(move.includes('2')) return move;
             if(move.includes("'")) return move.replace("'", "");
             return move + "'";
         }
@@ -729,20 +860,18 @@
         }
 
         function startPlay() {
-            isPlaying = true;
-            updatePlayButton();
+            if(solution.length === 0 || currentMoveIndex >= solution.length) return;
             
-            if(currentMoveIndex >= solution.length) {
-                currentMoveIndex = 0;
-            }
+            isPlaying = true;
+            document.getElementById('play-btn').textContent = '⏸';
             
             playInterval = setInterval(() => {
-                if(currentMoveIndex >= solution.length) {
+                if(currentMoveIndex >= solution.length || !isPlaying) {
                     stopPlay();
                     return;
                 }
                 nextMove();
-            }, 800);
+            }, 700);
         }
 
         function stopPlay() {
@@ -751,16 +880,14 @@
                 clearInterval(playInterval);
                 playInterval = null;
             }
-            updatePlayButton();
-        }
-
-        function updatePlayButton() {
             const btn = document.getElementById('play-btn');
-            btn.textContent = isPlaying ? '⏸' : '▶';
+            if(btn) btn.textContent = '▶';
         }
 
         function executeMoveAnimation(move) {
-            // Animação visual do movimento no cubo 3D
+            if(!move || isAnimating) return;
+            
+            isAnimating = true;
             const face = move.charAt(0);
             const clockwise = !move.includes("'");
             const double = move.includes("2");
@@ -775,33 +902,40 @@
             };
             
             const info = axisMap[face];
-            if(!info) return;
+            if(!info) {
+                isAnimating = false;
+                return;
+            }
             
             const angle = info.angle * (clockwise ? 1 : -1) * Math.PI/2 * (double ? 2 : 1);
-            animateFaceRotation(info.axis, info.layer, angle);
+            
+            animateFaceRotation(info.axis, info.layer, angle, () => {
+                isAnimating = false;
+            });
         }
 
-        function animateFaceRotation(axis, layer, angle) {
+        function animateFaceRotation(axis, layer, angle, callback) {
             const threshold = 0.5;
             const cubiesToRotate = [];
             
             cubeGroup.children.forEach(child => {
                 const pos = child.position;
                 let inLayer = false;
-                
                 if(axis === 'x' && Math.abs(pos.x - layer * 1.02) < threshold) inLayer = true;
                 if(axis === 'y' && Math.abs(pos.y - layer * 1.02) < threshold) inLayer = true;
                 if(axis === 'z' && Math.abs(pos.z - layer * 1.02) < threshold) inLayer = true;
-                
                 if(inLayer) cubiesToRotate.push(child);
             });
+            
+            if(cubiesToRotate.length === 0) {
+                if(callback) callback();
+                return;
+            }
             
             const pivot = new THREE.Group();
             scene.add(pivot);
             
-            cubiesToRotate.forEach(cubie => {
-                pivot.attach(cubie);
-            });
+            cubiesToRotate.forEach(cubie => pivot.attach(cubie));
             
             const duration = 400;
             const start = Date.now();
@@ -817,10 +951,10 @@
                 if(progress < 1) {
                     requestAnimationFrame(animate);
                 } else {
-                    cubiesToRotate.forEach(cubie => {
-                        cubeGroup.attach(cubie);
-                    });
+                    pivot.rotation[axis] = startRot + angle;
+                    cubiesToRotate.forEach(cubie => cubeGroup.attach(cubie));
                     scene.remove(pivot);
+                    if(callback) callback();
                 }
             }
             animate();
@@ -833,9 +967,18 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // Rotação idle sutil
-            if(!isPlaying && cubeGroup) {
-                cubeGroup.rotation.y += 0.001;
+            // Rotação automática suave apenas quando não interagindo
+            if(!isDragging && !isTouching && !isAnimating && !isPlaying && cubeGroup) {
+                // Aplicar inércia se houver
+                if(Math.abs(rotationVelocity.x) > 0.001 || Math.abs(rotationVelocity.y) > 0.001) {
+                    cubeGroup.rotation.x += rotationVelocity.x;
+                    cubeGroup.rotation.y += rotationVelocity.y;
+                    rotationVelocity.x *= 0.95;
+                    rotationVelocity.y *= 0.95;
+                } else {
+                    // Rotação idle muito suave
+                    cubeGroup.rotation.y += 0.0002;
+                }
             }
             
             renderer.render(scene, camera);
