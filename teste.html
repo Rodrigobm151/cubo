@@ -3,32 +3,46 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-<meta name="theme-color" content="#0a0f1e" />
-<title>Desvia! — runner 3D</title>
+<meta name="theme-color" content="#050912" />
+<title>Desvia! — runner 3D (v2)</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden;background:#0a0f1e;color:#e8f0ff;
+  html,body{height:100%;overflow:hidden;background:#050912;color:#e8f0ff;
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   canvas{display:block;touch-action:none}
+  #flash{position:fixed;inset:0;pointer-events:none;background:#fff;opacity:0;z-index:5;
+    transition:opacity .15s}
 
   #hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;
     justify-content:space-between;
     padding:calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 16px)
             calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 16px)}
-  .hud-top{display:flex;justify-content:space-between;align-items:flex-start}
-  .stat{font-size:11px;opacity:.65;letter-spacing:.1em;text-transform:uppercase}
+  .hud-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .stat{font-size:11px;opacity:.6;letter-spacing:.1em;text-transform:uppercase}
   .value{font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
-  #speedBar{height:4px;width:44vw;max-width:200px;border-radius:2px;margin-top:8px;
+  .bar{height:4px;width:44vw;max-width:200px;border-radius:2px;margin-top:8px;
     background:rgba(255,255,255,.12);overflow:hidden}
-  #speedFill{height:100%;width:0%;background:linear-gradient(90deg,#38e8b0,#ffd166,#ff4d6d);
+  .fill{height:100%;width:0%;background:linear-gradient(90deg,#38e8b0,#ffd166,#ff4d6d);
     transition:width .12s linear}
+  #boostBar{margin-top:8px;background:rgba(255,255,255,.12)}
+  #boostFill{height:100%;width:100%;background:linear-gradient(90deg,#ffd166,#ff7a00,#ff2a4d);
+    transition:width .08s linear}
+
+  #cam{position:fixed;right:calc(env(safe-area-inset-right) + 14px);
+    bottom:calc(env(safe-area-inset-bottom) + 74px);
+    width:78px;height:78px;border-radius:50%;object-fit:cover;background:#000;
+    border:2px solid #38e8b0;transform:scaleX(-1);opacity:0;pointer-events:none;
+    transition:opacity .3s;z-index:6}
+  #cam.on{opacity:.85}
 
   #overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:16px;padding:28px;text-align:center;
-    background:rgba(6,10,20,.84);backdrop-filter:blur(8px);transition:opacity .25s}
+    background:rgba(4,8,16,.86);backdrop-filter:blur(10px);transition:opacity .25s}
   #overlay.hidden{opacity:0;pointer-events:none}
-  #overlay h1{font-size:clamp(28px,9vw,46px);letter-spacing:-.02em}
-  #overlay p{max-width:34ch;font-size:15px;line-height:1.55;opacity:.78}
+  #overlay h1{font-size:clamp(30px,10vw,48px);letter-spacing:-.02em;
+    background:linear-gradient(180deg,#5cffc8,#22c99a);-webkit-background-clip:text;
+    background-clip:text;color:transparent}
+  #overlay p{max-width:36ch;font-size:15px;line-height:1.55;opacity:.8}
   #score{font-size:54px;font-weight:800;color:#5cffc8;line-height:1;
     font-variant-numeric:tabular-nums}
   .btn{pointer-events:auto;cursor:pointer;border:0;border-radius:999px;padding:16px 46px;
@@ -38,10 +52,15 @@
   .btn:active{transform:scale(.95)}
   .btn.ghost{background:transparent;color:#9fb3d9;box-shadow:none;padding:10px 22px;
     font-size:12px;font-weight:600;border:1px solid rgba(159,179,217,.28)}
-  #warn{font-size:12px;opacity:.45;max-width:32ch;line-height:1.5}
+  .toggle{pointer-events:auto;display:inline-flex;align-items:center;gap:10px;
+    font-size:13px;color:#9fb3d9;cursor:pointer;user-select:none}
+  .toggle input{accent-color:#22c99a;width:18px;height:18px}
+  #warn{font-size:11px;opacity:.45;max-width:34ch;line-height:1.5}
 </style>
 </head>
 <body>
+
+<div id="flash"></div>
 
 <div id="hud">
   <div class="hud-top">
@@ -52,7 +71,9 @@
     <div style="text-align:right">
       <div class="stat">Velocidade</div>
       <div class="value" id="spd">0 km/h</div>
-      <div id="speedBar"><div id="speedFill"></div></div>
+      <div class="bar"><div class="fill" id="speedFill"></div></div>
+      <div class="stat" style="margin-top:10px">Turbo (boca)</div>
+      <div class="bar" id="boostBar"><div id="boostFill"></div></div>
     </div>
   </div>
   <div style="pointer-events:auto;display:flex;justify-content:center">
@@ -60,10 +81,13 @@
   </div>
 </div>
 
+<video id="cam" playsinline muted autoplay></video>
+
 <div id="overlay">
   <h1 id="title">DESVIA!</h1>
-  <p id="desc">Incline o celular para os lados para desviar dos blocos. A esteira acelera sozinha — aguente o quanto puder.</p>
+  <p id="desc">Incline o celular para desviar. A esteira acelera — aguente o quanto puder.</p>
   <div id="score"></div>
+  <label class="toggle"><input type="checkbox" id="camToggle" /> Ativar câmera (turbo com a boca)</label>
   <button class="btn" id="startBtn">Começar</button>
   <div id="warn"></div>
 </div>
@@ -73,42 +97,44 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 
 /* ================= CONFIG ================= */
 const CFG = {
-  roadWidth:    9,
-  maxLateral:   3.6,
+  roadWidth:    7.0,
+  maxLateral:   2.8,
   playerZ:      2,
   spawnZ:      -110,
   despawnZ:     16,
-  baseSpeed:    16,      // unidades (=metros) por segundo
-  maxSpeed:     64,
-  accelPerSec:  0.6,
-  tiltRange:    22,      // graus de inclinação para ir de ponta a ponta
-  invertTilt:   false,   // troque para true se o controle parecer invertido
-  gapStart:     1.15,    // s entre fileiras no início
-  gapEnd:       0.72,    // s entre fileiras no fim
+  baseSpeed:    14,
+  maxSpeed:     50,
+  accelPerSec:  1.0,
+  tiltRange:    22,
+  invertTilt:   false,
+  gapStart:     1.2,
+  gapEnd:       0.65,
+  collideHalf:  1.3,   // corrige o exploit entre faixas
+  boostMult:    1.5,
+  boostDur:     1.4,
+  boostCool:    1.2,
+  mouthOpen:    0.45,
+  mouthHold:    0.18,
 };
-const LANES = [-3, 0, 3];
-const DASH_GAP = 7, DASH_COUNT = 26, DASH_SPAN = DASH_GAP * DASH_COUNT;
+const LANES = [-2.4, 0, 2.4];
+const DASH_GAP = 6.5, DASH_COUNT = 28, DASH_SPAN = DASH_GAP * DASH_COUNT;
 
 /* ================= DOM ================= */
+const $ = id => document.getElementById(id);
 const el = {
-  overlay:  document.getElementById('overlay'),
-  title:    document.getElementById('title'),
-  desc:     document.getElementById('desc'),
-  score:    document.getElementById('score'),
-  startBtn: document.getElementById('startBtn'),
-  warn:     document.getElementById('warn'),
-  dist:     document.getElementById('dist'),
-  spd:      document.getElementById('spd'),
-  fill:     document.getElementById('speedFill'),
-  calib:    document.getElementById('calib'),
+  overlay:  $('overlay'), title: $('title'), desc: $('desc'), score: $('score'),
+  startBtn: $('startBtn'), warn: $('warn'), camToggle: $('camToggle'),
+  dist: $('dist'), spd: $('spd'), speedFill: $('speedFill'), boostFill: $('boostFill'),
+  calib: $('calib'), cam: $('cam'), flash: $('flash'),
 };
 
 /* ================= ESTADO ================= */
 const S = {
-  mode: 'menu',          // menu | playing | over
+  mode: 'menu',
   speed: CFG.baseSpeed,
   distance: 0,
-  spawnTimer: 0.8,
+  spawnTimer: 0.9,
+  lastOpenLane: 0,
   targetX: 0,
   keyX: 0,
   touchX: null,
@@ -116,78 +142,98 @@ const S = {
   tiltZero: null,
   tiltRaw: 0,
   tiltSmooth: 0,
+  boost: { active: false, tLeft: 0, cooldown: 0, meter: 1 },
+  mouthOpenAcc: 0,
+  faceOn: false,
+  faceBusy: false,
+  lastDetect: 0,
+  baseFov: 60,
 };
 
 /* ================= CENA ================= */
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0f1e);
-scene.fog = new THREE.Fog(0x0a0f1e, 38, 118);
+scene.background = new THREE.Color(0x050912);
+scene.fog = new THREE.Fog(0x050912, 38, 118);
 
 const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
 camera.position.set(0, 4.8, 10);
 camera.lookAt(0, 1, -10);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); // teto de 2 = economia de GPU
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-const H_FOV = THREE.MathUtils.degToRad(72);
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h);
   camera.aspect = w / h;
-  // mantém um campo de visão HORIZONTAL constante (funciona em retrato e paisagem)
+  // FOV horizontal constante → funciona em retrato e paisagem
+  const H_FOV = THREE.MathUtils.degToRad(72);
   camera.fov = THREE.MathUtils.clamp(
     THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(H_FOV / 2) / camera.aspect)), 45, 100
   );
   camera.updateProjectionMatrix();
+  S.baseFov = camera.fov;
 }
 addEventListener('resize', resize);
-resize();
 
 /* ================= LUZES ================= */
-scene.add(new THREE.HemisphereLight(0x9dc2ff, 0x0a1020, 1.15));
-const key = new THREE.DirectionalLight(0xffffff, 1.5);
-key.position.set(8, 18, 8);
-scene.add(key);
-const rim = new THREE.DirectionalLight(0x38e8b0, 0.9);
+scene.add(new THREE.HemisphereLight(0x9dc2ff, 0x0a1020, 0.9));
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+keyLight.position.set(8, 18, 6);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.camera.left = -12;
+keyLight.shadow.camera.right = 12;
+keyLight.shadow.camera.top = 12;
+keyLight.shadow.camera.bottom = -12;
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 40;
+keyLight.shadow.bias = -0.0005;
+scene.add(keyLight);
+const rim = new THREE.DirectionalLight(0x38e8b0, 1.2);
 rim.position.set(-8, 5, -12);
 scene.add(rim);
 
 /* ================= PISTA ================= */
 const road = new THREE.Mesh(
   new THREE.BoxGeometry(CFG.roadWidth, 0.6, 320),
-  new THREE.MeshStandardMaterial({ color: 0x161d2c, roughness: 0.92, metalness: 0.05 })
+  new THREE.MeshStandardMaterial({ color: 0x121a2a, roughness: 0.92, metalness: 0.05 })
 );
 road.position.set(0, -0.3, -140);
+road.receiveShadow = true;
 scene.add(road);
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(500, 500),
-  new THREE.MeshStandardMaterial({ color: 0x060a12 })
+  new THREE.MeshStandardMaterial({ color: 0x03060c })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.62;
+ground.receiveShadow = true;
 scene.add(ground);
 
-// trilhos luminosos nas bordas
 const railMat = new THREE.MeshStandardMaterial({
-  color: 0x2de1c2, emissive: 0x2de1c2, emissiveIntensity: 1.1,
+  color: 0x2de1c2, emissive: 0x2de1c2, emissiveIntensity: 1.4,
 });
-for (const x of [-CFG.roadWidth / 2 - 0.18, CFG.roadWidth / 2 + 0.18]) {
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 320), railMat);
+for (const x of [-CFG.roadWidth / 2 - 0.15, CFG.roadWidth / 2 + 0.15]) {
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 320), railMat);
   rail.position.set(x, 0.06, -140);
   scene.add(rail);
 }
 
-// faixas tracejadas (a "textura" que dá sensação de velocidade)
-const dashGeo = new THREE.BoxGeometry(0.16, 0.02, 2.6);
+// faixas tracejadas (agora entre as 3 faixas: ±1.2)
+const dashGeo = new THREE.BoxGeometry(0.14, 0.02, 2.4);
 const dashMat = new THREE.MeshStandardMaterial({
-  color: 0x4a6a9a, emissive: 0x18365e, emissiveIntensity: 0.7,
+  color: 0x4a6a9a, emissive: 0x1c4a80, emissiveIntensity: 0.9,
 });
 const dashes = [];
-for (const x of [-1.5, 1.5]) {
+for (const x of [-1.2, 1.2]) {
   for (let i = 0; i < DASH_COUNT; i++) {
     const d = new THREE.Mesh(dashGeo, dashMat);
     d.position.set(x, 0.02, 12 - i * DASH_GAP);
@@ -196,109 +242,268 @@ for (const x of [-1.5, 1.5]) {
   }
 }
 
-/* ================= JOGADOR ================= */
+// estrelas ao fundo
+{
+  const N = 400;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const r = 90 + Math.random() * 220;
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.acos(2 * Math.random() - 1);
+    pos[i*3]   = r * Math.sin(ph) * Math.cos(th);
+    pos[i*3+1] = Math.abs(r * Math.cos(ph)) + 20;
+    pos[i*3+2] = r * Math.sin(ph) * Math.sin(th);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({
+    color: 0x88aaff, size: 0.6, sizeAttenuation: true, transparent: true, opacity: 0.75,
+  })));
+}
+
+// riscos de velocidade nas laterais
+const streaks = [];
+{
+  const geo = new THREE.BoxGeometry(0.05, 0.05, 3.2);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x5cffc8, emissive: 0x2de1c2, emissiveIntensity: 2, transparent: true, opacity: 0.55,
+  });
+  for (let i = 0; i < 18; i++) {
+    const s = new THREE.Mesh(geo, mat);
+    s.position.set((Math.random() < 0.5 ? -1 : 1) * (CFG.roadWidth / 2 + 0.6 + Math.random()),
+                   0.3 + Math.random() * 0.6,
+                   12 - Math.random() * 130);
+    scene.add(s);
+    streaks.push(s);
+  }
+}
+
+/* ================= JOGADOR (carro) ================= */
 const player = new THREE.Group();
-const bodyMat = new THREE.MeshStandardMaterial({
-  color: 0x38e8b0, emissive: 0x0f8f6b, emissiveIntensity: 0.55,
-  roughness: 0.35, metalness: 0.25,
-});
-const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.2), bodyMat);
-body.position.y = 0.35;
-player.add(body);
-const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.42, 0.55), bodyMat);
-head.position.set(0, 0.78, 0.12);
-player.add(head);
-player.position.set(0, 0, CFG.playerZ);
-scene.add(player);
+{
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0x38e8b0, emissive: 0x0f8f6b, emissiveIntensity: 0.4,
+    roughness: 0.3, metalness: 0.65,
+  });
+  const darkMat = new THREE.MeshStandardMaterial({
+    color: 0x0a1420, roughness: 0.15, metalness: 0.9,
+  });
+  const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.32, 1.5), bodyMat);
+  chassis.position.y = 0.3; chassis.castShadow = true; player.add(chassis);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.7), darkMat);
+  cabin.position.set(0, 0.6, -0.1); cabin.castShadow = true; player.add(cabin);
+  const spoiler = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.2), darkMat);
+  spoiler.position.set(0, 0.66, 0.66); player.add(spoiler);
+  const hlMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2.5,
+  });
+  for (const sx of [-0.28, 0.28]) {
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.05), hlMat);
+    hl.position.set(sx, 0.32, -0.76); player.add(hl);
+  }
+  const tlMat = new THREE.MeshStandardMaterial({
+    color: 0xff2a4d, emissive: 0xff2a4d, emissiveIntensity: 2.5,
+  });
+  for (const sx of [-0.3, 0.3]) {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.04), tlMat);
+    tl.position.set(sx, 0.32, 0.76); player.add(tl);
+  }
+  const wGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.14, 10);
+  const wMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.85 });
+  for (const [sx, sz] of [[-0.48,-0.5],[0.48,-0.5],[-0.48,0.5],[0.48,0.5]]) {
+    const w = new THREE.Mesh(wGeo, wMat);
+    w.rotation.z = Math.PI / 2; w.position.set(sx, 0.16, sz);
+    w.castShadow = true; player.add(w);
+  }
+  player.position.set(0, 0, CFG.playerZ);
+  scene.add(player);
+}
 
 /* ================= OBSTÁCULOS (pool) ================= */
-const POOL = 24;
-const obstGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+const POOL = 30;
 const obstacles = [];
+const obstGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+const obstEdgeGeo = new THREE.EdgesGeometry(obstGeo);
 for (let i = 0; i < POOL; i++) {
-  const m = new THREE.Mesh(obstGeo, new THREE.MeshStandardMaterial({
-    color: 0xff4d6d, emissive: 0x7a0f22, emissiveIntensity: 0.65, roughness: 0.5,
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(obstGeo, new THREE.MeshStandardMaterial({
+    color: 0xff4d6d, emissive: 0x7a0f22, emissiveIntensity: 0.8,
+    roughness: 0.45, metalness: 0.3,
   }));
-  m.visible = false;
-  m.position.set(0, 0.8, CFG.spawnZ);
-  m.userData.active = false;
-  scene.add(m);
-  obstacles.push(m);
+  core.position.y = 0.8;
+  core.castShadow = true;
+  core.receiveShadow = true;
+  g.add(core);
+  const edges = new THREE.LineSegments(obstEdgeGeo,
+    new THREE.LineBasicMaterial({ color: 0xff9fb3, transparent: true, opacity: 0.9 }));
+  edges.position.y = 0.8;
+  g.add(edges);
+  g.visible = false;
+  g.userData.active = false;
+  scene.add(g);
+  obstacles.push(g);
 }
 
 /* ================= INPUT: GIROSCÓPIO ================= */
 function onOrientation(e) {
   if (e.gamma === null || e.gamma === undefined) return;
   S.hasGyro = true;
-
-  // corrige o eixo conforme a rotação da tela (retrato x paisagem)
   const a = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
   let v;
-  if (a === 0)              v = e.gamma;
-  else if (a === 90)        v = e.beta;
+  if (a === 0) v = e.gamma;
+  else if (a === 90) v = e.beta;
   else if (a === 270 || a === -90) v = -e.beta;
-  else                      v = -e.gamma;
-
-  if (S.tiltZero === null) S.tiltZero = v;   // calibra na posição atual da mão
+  else v = -e.gamma;
+  if (S.tiltZero === null) S.tiltZero = v;
   S.tiltRaw = (CFG.invertTilt ? -1 : 1) * (v - S.tiltZero);
-  S.tiltSmooth += (S.tiltRaw - S.tiltSmooth) * 0.35;  // suaviza jitter do sensor
+  S.tiltSmooth += (S.tiltRaw - S.tiltSmooth) * 0.35;
 }
 
-/* ================= INPUT: TOQUE (fallback universal) ================= */
-function pointerX(clientX) {
-  const t = (clientX / innerWidth - 0.5) * 2;            // -1..1
-  return THREE.MathUtils.clamp(t * (CFG.maxLateral + 0.6), -CFG.maxLateral, CFG.maxLateral);
+/* ================= INPUT: TOQUE / TECLADO ================= */
+function pointerX(cx) {
+  const t = (cx / innerWidth - 0.5) * 2;
+  return THREE.MathUtils.clamp(t * (CFG.maxLateral + 0.4), -CFG.maxLateral, CFG.maxLateral);
 }
 renderer.domElement.addEventListener('pointerdown', e => { if (S.mode === 'playing') S.touchX = pointerX(e.clientX); });
 renderer.domElement.addEventListener('pointermove', e => { if (S.mode === 'playing' && S.touchX !== null) S.touchX = pointerX(e.clientX); });
-addEventListener('pointerup',     () => { S.touchX = null; });
+addEventListener('pointerup', () => { S.touchX = null; });
 addEventListener('pointercancel', () => { S.touchX = null; });
-
-/* ================= INPUT: TECLADO (desktop) ================= */
 addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft'  || e.key === 'a') S.keyX = -1;
-  if (e.key === 'ArrowRight' || e.key === 'd') S.keyX =  1;
+  if (e.key === 'ArrowLeft' || e.key === 'a') S.keyX = -1;
+  if (e.key === 'ArrowRight' || e.key === 'd') S.keyX = 1;
 });
 addEventListener('keyup', e => {
   if (['ArrowLeft','a','ArrowRight','d'].includes(e.key)) S.keyX = 0;
 });
 
+/* ================= FACE DETECTION (opcional) ================= */
+let faceLandmarker = null;
+
+async function initFace() {
+  const { FaceLandmarker, FilesetResolver } = await import(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.10'
+  );
+  const resolver = await FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.10/wasm'
+  );
+  faceLandmarker = await FaceLandmarker.createFromOptions(resolver, {
+    baseOptions: {
+      modelAssetPath:
+        'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+      delegate: 'GPU',
+    },
+    outputFaceBlendshapes: true,
+    runningMode: 'VIDEO',
+    numFaces: 1,
+  });
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
+    audio: false,
+  });
+  el.cam.srcObject = stream;
+  await el.cam.play();
+  el.cam.classList.add('on');
+  S.faceOn = true;
+  requestAnimationFrame(faceLoop);
+}
+
+function faceLoop(now) {
+  requestAnimationFrame(faceLoop);
+  if (!S.faceOn || !faceLandmarker || S.mode !== 'playing') return;
+  if (now - S.lastDetect < 80) return;      // ~12 fps
+  if (el.cam.readyState < 2) return;
+  S.lastDetect = now;
+
+  let res;
+  try { res = faceLandmarker.detectForVideo(el.cam, now); }
+  catch (_) { return; }
+
+  const bs = res.faceBlendshapes && res.faceBlendshapes[0];
+  if (!bs) { S.mouthOpenAcc = 0; return; }
+
+  const jaw = bs.categories.find(c => c.categoryName === 'jawOpen');
+  const open = jaw && jaw.score > CFG.mouthOpen;
+
+  if (open) {
+    S.mouthOpenAcc += 0.08;
+    const b = S.boost;
+    if (S.mouthOpenAcc > CFG.mouthHold && !b.active && b.cooldown <= 0 && b.meter >= 1) {
+      b.active = true;
+      b.tLeft = CFG.boostDur;
+      b.meter = 0;
+      flashScreen('#5cffc8', 0.35);
+    }
+  } else {
+    S.mouthOpenAcc = 0;
+  }
+}
+
+function flashScreen(color, alpha) {
+  el.flash.style.background = color;
+  el.flash.style.opacity = alpha;
+  setTimeout(() => { el.flash.style.opacity = 0; }, 90);
+}
+
 /* ================= REGRAS ================= */
 function reset() {
   S.speed = CFG.baseSpeed;
   S.distance = 0;
-  S.spawnTimer = 0.8;
+  S.spawnTimer = 0.9;
+  S.lastOpenLane = 0;
   S.targetX = 0;
   S.touchX = null;
-  S.tiltZero = null;         // recalibra a cada partida
+  S.tiltZero = null;
   S.tiltSmooth = 0;
-  player.position.x = 0;
+  S.keyX = 0;
+  S.boost = { active: false, tLeft: 0, cooldown: 0, meter: 1 };
+  S.mouthOpenAcc = 0;
+  player.position.set(0, 0, CFG.playerZ);
   player.rotation.z = 0;
   camera.position.x = 0;
+  camera.fov = S.baseFov;
+  camera.updateProjectionMatrix();
   for (const o of obstacles) { o.userData.active = false; o.visible = false; }
 }
 
 function spawnRow() {
-  const pool = LANES.slice();
-  // a partir de certa velocidade, bloqueia 2 das 3 faixas
-  const nBlock = (S.speed > 32 && Math.random() < 0.35) ? 2 : 1;
-  for (let i = 0; i < nBlock; i++) {
-    const x = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+  // faixa livre (rotaciona 70% pra forçar movimentação)
+  let openLane = S.lastOpenLane;
+  if (Math.random() < 0.7) {
+    do { openLane = Math.floor(Math.random() * 3); }
+    while (openLane === S.lastOpenLane);
+  }
+  S.lastOpenLane = openLane;
+
+  // warmup: bloqueia 1; depois bloqueia 2 (só 1 faixa livre)
+  const warmup = S.distance < 40;
+  const nBlock = warmup ? 1 : 2;
+  const candidates = [0, 1, 2].filter(i => i !== openLane);
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
+  for (let k = 0; k < nBlock && k < candidates.length; k++) {
+    const laneIdx = candidates[k];
     const o = obstacles.find(o => !o.userData.active);
     if (!o) break;
-    o.position.set(x, 0.8, CFG.spawnZ);
+    o.position.set(LANES[laneIdx], 0, CFG.spawnZ);
     o.visible = true;
     o.userData.active = true;
   }
+
   const t = (S.speed - CFG.baseSpeed) / (CFG.maxSpeed - CFG.baseSpeed);
-  S.spawnTimer = THREE.MathUtils.lerp(CFG.gapStart, CFG.gapEnd, t); // gap em SEGUNDOS
+  S.spawnTimer = THREE.MathUtils.lerp(CFG.gapStart, CFG.gapEnd, t);
 }
 
 function gameOver() {
   S.mode = 'over';
   if (navigator.vibrate) navigator.vibrate(120);
+  flashScreen('#ff2a4d', 0.55);
+  camera.position.x += 0.4 * (Math.random() - 0.5);
   el.title.textContent = 'Bateu!';
-  el.desc.textContent  = 'A esteira não perdoa. Tenta de novo?';
+  el.desc.textContent = 'A esteira não perdoa. Tenta de novo?';
   el.score.textContent = Math.floor(S.distance) + ' m';
   el.startBtn.textContent = 'Jogar de novo';
   el.overlay.classList.remove('hidden');
@@ -306,31 +511,58 @@ function gameOver() {
 
 /* ================= UPDATE ================= */
 function updatePlaying(dt) {
-  /* --- velocidade e dificuldade --- */
-  S.speed = Math.min(CFG.maxSpeed, S.speed + CFG.accelPerSec * dt);
-  S.distance += S.speed * dt;
+  const b = S.boost;
 
-  /* --- entrada lateral --- */
+  // cooldown/refresh do boost
+  if (b.active) {
+    b.tLeft -= dt;
+    if (b.tLeft <= 0) {
+      b.active = false;
+      b.cooldown = CFG.boostCool;
+    }
+  } else if (b.cooldown > 0) {
+    b.cooldown -= dt;
+    b.meter = Math.min(1, 1 - b.cooldown / CFG.boostCool);
+  }
+
+  const speedMult = b.active ? CFG.boostMult : 1;
+  S.speed = Math.min(CFG.maxSpeed, S.speed + CFG.accelPerSec * dt);
+  const effSpeed = S.speed * speedMult;
+  S.distance += effSpeed * dt;
+
+  // entrada lateral
   if (S.touchX !== null) {
     S.targetX = S.touchX;
   } else if (S.hasGyro) {
     S.targetX = THREE.MathUtils.clamp(S.tiltSmooth / CFG.tiltRange, -1, 1) * CFG.maxLateral;
   } else {
-    S.keyX += 0; // teclado usa alvo contínuo abaixo
     S.targetX = THREE.MathUtils.clamp(S.keyX * CFG.maxLateral, -CFG.maxLateral, CFG.maxLateral);
   }
-  // interpolação: dá peso/inércia ao movimento
   player.position.x += (S.targetX - player.position.x) * Math.min(1, dt * 14);
   player.position.x = THREE.MathUtils.clamp(player.position.x, -CFG.maxLateral, CFG.maxLateral);
-  // inclinação visual do corpo ao trocar de faixa
   player.rotation.z = THREE.MathUtils.clamp((S.targetX - player.position.x) * 0.35, -0.4, 0.4);
 
-  /* --- esteira --- */
-  const move = S.speed * dt;
+  // FOV boost (ar visual de velocidade)
+  const targetFov = S.baseFov + (b.active ? 9 : 0);
+  if (Math.abs(camera.fov - targetFov) > 0.05) {
+    camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8);
+    camera.updateProjectionMatrix();
+  }
+
+  // esteira
+  const move = effSpeed * dt;
 
   for (const d of dashes) {
     d.position.z += move;
     if (d.position.z > 12) d.position.z -= DASH_SPAN;
+  }
+  for (const s of streaks) {
+    s.position.z += move * 1.6;
+    if (s.position.z > 12) {
+      s.position.z -= 140;
+      s.position.x = (Math.random() < 0.5 ? -1 : 1) * (CFG.roadWidth / 2 + 0.6 + Math.random());
+    }
+    s.material.opacity = 0.25 + (b.active ? 0.65 : 0.3) * Math.random();
   }
 
   const pzMin = CFG.playerZ - 1.3;
@@ -342,24 +574,23 @@ function updatePlaying(dt) {
     const z0 = o.position.z;
     const z1 = z0 + move;
     o.position.z = z1;
-
     if (z1 > CFG.despawnZ) { o.userData.active = false; o.visible = false; continue; }
-
-    // colisão por INTERVALO percorrido (evita tunneling em alta velocidade)
-    if (z0 < pzMax && z1 > pzMin && Math.abs(o.position.x - px) < 1.15) {
+    // teste por intervalo percorrido (evita tunneling)
+    if (z0 <= pzMax && z1 >= pzMin && Math.abs(o.position.x - px) < CFG.collideHalf) {
       gameOver();
       return;
     }
   }
 
-  /* --- spawn --- */
   S.spawnTimer -= dt;
   if (S.spawnTimer <= 0) spawnRow();
 
-  /* --- HUD --- */
+  // HUD
   el.dist.textContent = Math.floor(S.distance) + ' m';
-  el.spd.textContent  = Math.round(S.speed * 3.6) + ' km/h';
-  el.fill.style.width = ((S.speed - CFG.baseSpeed) / (CFG.maxSpeed - CFG.baseSpeed) * 100) + '%';
+  el.spd.textContent  = Math.round(effSpeed * 3.6) + ' km/h';
+  el.speedFill.style.width =
+    ((S.speed - CFG.baseSpeed) / (CFG.maxSpeed - CFG.baseSpeed) * 100) + '%';
+  el.boostFill.style.width = (b.active ? b.tLeft / CFG.boostDur : b.meter) * 100 + '%';
 }
 
 function updateCamera(dt) {
@@ -372,11 +603,9 @@ function updateCamera(dt) {
 let last = performance.now();
 function loop(now) {
   requestAnimationFrame(loop);
-  const dt = Math.min(0.05, (now - last) / 1000); // clamp: evita saltos ao voltar do background
+  const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-
   if (S.mode === 'playing') updatePlaying(dt);
-
   updateCamera(dt);
   renderer.render(scene, camera);
 }
@@ -384,20 +613,26 @@ requestAnimationFrame(loop);
 
 /* ================= FLUXO DE INÍCIO ================= */
 async function start() {
-  // iOS 13+ exige permissão do giroscópio dentro de um gesto do usuário
+  // iOS 13+ pede permissão do giroscópio no gesto
   if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       const r = await DeviceOrientationEvent.requestPermission();
-      if (r !== 'granted') el.warn.textContent = 'Giroscópio negado — use o dedo na tela para desviar.';
-    } catch (_) { /* segue sem giroscópio */ }
+      if (r !== 'granted') el.warn.textContent = 'Giroscópio negado — use o dedo na tela.';
+    } catch (_) {}
+  }
+  if (!S.hasGyro) window.addEventListener('deviceorientation', onOrientation);
+
+  // câmera (opcional)
+  if (el.camToggle.checked && !S.faceOn) {
+    try {
+      await initFace();
+    } catch (err) {
+      el.warn.textContent = 'Câmera indisponível: ' + (err.message || err);
+    }
   }
 
-  if (!S.hasGyro) {
-    window.addEventListener('deviceorientation', onOrientation);
-  }
-
-  // tela cheia (opcional, falha silenciosamente no iOS)
+  // tela cheia
   try {
     if (document.fullscreenEnabled && !document.fullscreenElement) {
       await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
@@ -411,7 +646,9 @@ async function start() {
   last = performance.now();
 
   setTimeout(() => {
-    if (!S.hasGyro) el.warn.textContent = 'Sem giroscópio detectado: arraste o dedo ou use ← →.';
+    if (!S.hasGyro && !el.warn.textContent) {
+      el.warn.textContent = 'Sem giroscópio: arraste o dedo ou use ← →.';
+    }
   }, 1500);
 }
 
@@ -419,9 +656,8 @@ el.startBtn.addEventListener('click', start);
 el.calib.addEventListener('click', () => { S.tiltZero = null; });
 document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
-// dica inicial
 if (!('ontouchstart' in window)) {
-  el.warn.textContent = 'No PC: use as setas ← → ou arraste o mouse.';
+  el.warn.textContent = 'No PC: setas ← → ou arraste o mouse.';
 }
 </script>
 </body>
