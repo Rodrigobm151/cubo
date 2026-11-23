@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="theme-color" content="#0a0f1e" />
+<title>Desvia! — runner 3D</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0a0f1e;color:#e8f0ff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  canvas{display:block;touch-action:none}
+
+  #hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;
+    justify-content:space-between;
+    padding:calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 16px)
+            calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 16px)}
+  .hud-top{display:flex;justify-content:space-between;align-items:flex-start}
+  .stat{font-size:11px;opacity:.65;letter-spacing:.1em;text-transform:uppercase}
+  .value{font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+  #speedBar{height:4px;width:44vw;max-width:200px;border-radius:2px;margin-top:8px;
+    background:rgba(255,255,255,.12);overflow:hidden}
+  #speedFill{height:100%;width:0%;background:linear-gradient(90deg,#38e8b0,#ffd166,#ff4d6d);
+    transition:width .12s linear}
+
+  #overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px;padding:28px;text-align:center;
+    background:rgba(6,10,20,.84);backdrop-filter:blur(8px);transition:opacity .25s}
+  #overlay.hidden{opacity:0;pointer-events:none}
+  #overlay h1{font-size:clamp(28px,9vw,46px);letter-spacing:-.02em}
+  #overlay p{max-width:34ch;font-size:15px;line-height:1.55;opacity:.78}
+  #score{font-size:54px;font-weight:800;color:#5cffc8;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .btn{pointer-events:auto;cursor:pointer;border:0;border-radius:999px;padding:16px 46px;
+    font-size:17px;font-weight:700;color:#06231a;
+    background:linear-gradient(180deg,#5cffc8,#22c99a);
+    box-shadow:0 8px 24px rgba(34,201,154,.35);transition:transform .1s}
+  .btn:active{transform:scale(.95)}
+  .btn.ghost{background:transparent;color:#9fb3d9;box-shadow:none;padding:10px 22px;
+    font-size:12px;font-weight:600;border:1px solid rgba(159,179,217,.28)}
+  #warn{font-size:12px;opacity:.45;max-width:32ch;line-height:1.5}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="hud-top">
+    <div>
+      <div class="stat">Distância</div>
+      <div class="value" id="dist">0 m</div>
+    </div>
+    <div style="text-align:right">
+      <div class="stat">Velocidade</div>
+      <div class="value" id="spd">0 km/h</div>
+      <div id="speedBar"><div id="speedFill"></div></div>
+    </div>
+  </div>
+  <div style="pointer-events:auto;display:flex;justify-content:center">
+    <button class="btn ghost" id="calib">Calibrar inclinação</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <h1 id="title">DESVIA!</h1>
+  <p id="desc">Incline o celular para os lados para desviar dos blocos. A esteira acelera sozinha — aguente o quanto puder.</p>
+  <div id="score"></div>
+  <button class="btn" id="startBtn">Começar</button>
+  <div id="warn"></div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+/* ================= CONFIG ================= */
+const CFG = {
+  roadWidth:    9,
+  maxLateral:   3.6,
+  playerZ:      2,
+  spawnZ:      -110,
+  despawnZ:     16,
+  baseSpeed:    16,      // unidades (=metros) por segundo
+  maxSpeed:     64,
+  accelPerSec:  0.6,
+  tiltRange:    22,      // graus de inclinação para ir de ponta a ponta
+  invertTilt:   false,   // troque para true se o controle parecer invertido
+  gapStart:     1.15,    // s entre fileiras no início
+  gapEnd:       0.72,    // s entre fileiras no fim
+};
+const LANES = [-3, 0, 3];
+const DASH_GAP = 7, DASH_COUNT = 26, DASH_SPAN = DASH_GAP * DASH_COUNT;
+
+/* ================= DOM ================= */
+const el = {
+  overlay:  document.getElementById('overlay'),
+  title:    document.getElementById('title'),
+  desc:     document.getElementById('desc'),
+  score:    document.getElementById('score'),
+  startBtn: document.getElementById('startBtn'),
+  warn:     document.getElementById('warn'),
+  dist:     document.getElementById('dist'),
+  spd:      document.getElementById('spd'),
+  fill:     document.getElementById('speedFill'),
+  calib:    document.getElementById('calib'),
+};
+
+/* ================= ESTADO ================= */
+const S = {
+  mode: 'menu',          // menu | playing | over
+  speed: CFG.baseSpeed,
+  distance: 0,
+  spawnTimer: 0.8,
+  targetX: 0,
+  keyX: 0,
+  touchX: null,
+  hasGyro: false,
+  tiltZero: null,
+  tiltRaw: 0,
+  tiltSmooth: 0,
+};
+
+/* ================= CENA ================= */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0f1e);
+scene.fog = new THREE.Fog(0x0a0f1e, 38, 118);
+
+const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
+camera.position.set(0, 4.8, 10);
+camera.lookAt(0, 1, -10);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); // teto de 2 = economia de GPU
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const H_FOV = THREE.MathUtils.degToRad(72);
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  // mantém um campo de visão HORIZONTAL constante (funciona em retrato e paisagem)
+  camera.fov = THREE.MathUtils.clamp(
+    THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(H_FOV / 2) / camera.aspect)), 45, 100
+  );
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+/* ================= LUZES ================= */
+scene.add(new THREE.HemisphereLight(0x9dc2ff, 0x0a1020, 1.15));
+const key = new THREE.DirectionalLight(0xffffff, 1.5);
+key.position.set(8, 18, 8);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x38e8b0, 0.9);
+rim.position.set(-8, 5, -12);
+scene.add(rim);
+
+/* ================= PISTA ================= */
+const road = new THREE.Mesh(
+  new THREE.BoxGeometry(CFG.roadWidth, 0.6, 320),
+  new THREE.MeshStandardMaterial({ color: 0x161d2c, roughness: 0.92, metalness: 0.05 })
+);
+road.position.set(0, -0.3, -140);
+scene.add(road);
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(500, 500),
+  new THREE.MeshStandardMaterial({ color: 0x060a12 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.62;
+scene.add(ground);
+
+// trilhos luminosos nas bordas
+const railMat = new THREE.MeshStandardMaterial({
+  color: 0x2de1c2, emissive: 0x2de1c2, emissiveIntensity: 1.1,
+});
+for (const x of [-CFG.roadWidth / 2 - 0.18, CFG.roadWidth / 2 + 0.18]) {
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 320), railMat);
+  rail.position.set(x, 0.06, -140);
+  scene.add(rail);
+}
+
+// faixas tracejadas (a "textura" que dá sensação de velocidade)
+const dashGeo = new THREE.BoxGeometry(0.16, 0.02, 2.6);
+const dashMat = new THREE.MeshStandardMaterial({
+  color: 0x4a6a9a, emissive: 0x18365e, emissiveIntensity: 0.7,
+});
+const dashes = [];
+for (const x of [-1.5, 1.5]) {
+  for (let i = 0; i < DASH_COUNT; i++) {
+    const d = new THREE.Mesh(dashGeo, dashMat);
+    d.position.set(x, 0.02, 12 - i * DASH_GAP);
+    scene.add(d);
+    dashes.push(d);
+  }
+}
+
+/* ================= JOGADOR ================= */
+const player = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({
+  color: 0x38e8b0, emissive: 0x0f8f6b, emissiveIntensity: 0.55,
+  roughness: 0.35, metalness: 0.25,
+});
+const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.2), bodyMat);
+body.position.y = 0.35;
+player.add(body);
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.42, 0.55), bodyMat);
+head.position.set(0, 0.78, 0.12);
+player.add(head);
+player.position.set(0, 0, CFG.playerZ);
+scene.add(player);
+
+/* ================= OBSTÁCULOS (pool) ================= */
+const POOL = 24;
+const obstGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+const obstacles = [];
+for (let i = 0; i < POOL; i++) {
+  const m = new THREE.Mesh(obstGeo, new THREE.MeshStandardMaterial({
+    color: 0xff4d6d, emissive: 0x7a0f22, emissiveIntensity: 0.65, roughness: 0.5,
+  }));
+  m.visible = false;
+  m.position.set(0, 0.8, CFG.spawnZ);
+  m.userData.active = false;
+  scene.add(m);
+  obstacles.push(m);
+}
+
+/* ================= INPUT: GIROSCÓPIO ================= */
+function onOrientation(e) {
+  if (e.gamma === null || e.gamma === undefined) return;
+  S.hasGyro = true;
+
+  // corrige o eixo conforme a rotação da tela (retrato x paisagem)
+  const a = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  let v;
+  if (a === 0)              v = e.gamma;
+  else if (a === 90)        v = e.beta;
+  else if (a === 270 || a === -90) v = -e.beta;
+  else                      v = -e.gamma;
+
+  if (S.tiltZero === null) S.tiltZero = v;   // calibra na posição atual da mão
+  S.tiltRaw = (CFG.invertTilt ? -1 : 1) * (v - S.tiltZero);
+  S.tiltSmooth += (S.tiltRaw - S.tiltSmooth) * 0.35;  // suaviza jitter do sensor
+}
+
+/* ================= INPUT: TOQUE (fallback universal) ================= */
+function pointerX(clientX) {
+  const t = (clientX / innerWidth - 0.5) * 2;            // -1..1
+  return THREE.MathUtils.clamp(t * (CFG.maxLateral + 0.6), -CFG.maxLateral, CFG.maxLateral);
+}
+renderer.domElement.addEventListener('pointerdown', e => { if (S.mode === 'playing') S.touchX = pointerX(e.clientX); });
+renderer.domElement.addEventListener('pointermove', e => { if (S.mode === 'playing' && S.touchX !== null) S.touchX = pointerX(e.clientX); });
+addEventListener('pointerup',     () => { S.touchX = null; });
+addEventListener('pointercancel', () => { S.touchX = null; });
+
+/* ================= INPUT: TECLADO (desktop) ================= */
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft'  || e.key === 'a') S.keyX = -1;
+  if (e.key === 'ArrowRight' || e.key === 'd') S.keyX =  1;
+});
+addEventListener('keyup', e => {
+  if (['ArrowLeft','a','ArrowRight','d'].includes(e.key)) S.keyX = 0;
+});
+
+/* ================= REGRAS ================= */
+function reset() {
+  S.speed = CFG.baseSpeed;
+  S.distance = 0;
+  S.spawnTimer = 0.8;
+  S.targetX = 0;
+  S.touchX = null;
+  S.tiltZero = null;         // recalibra a cada partida
+  S.tiltSmooth = 0;
+  player.position.x = 0;
+  player.rotation.z = 0;
+  camera.position.x = 0;
+  for (const o of obstacles) { o.userData.active = false; o.visible = false; }
+}
+
+function spawnRow() {
+  const pool = LANES.slice();
+  // a partir de certa velocidade, bloqueia 2 das 3 faixas
+  const nBlock = (S.speed > 32 && Math.random() < 0.35) ? 2 : 1;
+  for (let i = 0; i < nBlock; i++) {
+    const x = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    const o = obstacles.find(o => !o.userData.active);
+    if (!o) break;
+    o.position.set(x, 0.8, CFG.spawnZ);
+    o.visible = true;
+    o.userData.active = true;
+  }
+  const t = (S.speed - CFG.baseSpeed) / (CFG.maxSpeed - CFG.baseSpeed);
+  S.spawnTimer = THREE.MathUtils.lerp(CFG.gapStart, CFG.gapEnd, t); // gap em SEGUNDOS
+}
+
+function gameOver() {
+  S.mode = 'over';
+  if (navigator.vibrate) navigator.vibrate(120);
+  el.title.textContent = 'Bateu!';
+  el.desc.textContent  = 'A esteira não perdoa. Tenta de novo?';
+  el.score.textContent = Math.floor(S.distance) + ' m';
+  el.startBtn.textContent = 'Jogar de novo';
+  el.overlay.classList.remove('hidden');
+}
+
+/* ================= UPDATE ================= */
+function updatePlaying(dt) {
+  /* --- velocidade e dificuldade --- */
+  S.speed = Math.min(CFG.maxSpeed, S.speed + CFG.accelPerSec * dt);
+  S.distance += S.speed * dt;
+
+  /* --- entrada lateral --- */
+  if (S.touchX !== null) {
+    S.targetX = S.touchX;
+  } else if (S.hasGyro) {
+    S.targetX = THREE.MathUtils.clamp(S.tiltSmooth / CFG.tiltRange, -1, 1) * CFG.maxLateral;
+  } else {
+    S.keyX += 0; // teclado usa alvo contínuo abaixo
+    S.targetX = THREE.MathUtils.clamp(S.keyX * CFG.maxLateral, -CFG.maxLateral, CFG.maxLateral);
+  }
+  // interpolação: dá peso/inércia ao movimento
+  player.position.x += (S.targetX - player.position.x) * Math.min(1, dt * 14);
+  player.position.x = THREE.MathUtils.clamp(player.position.x, -CFG.maxLateral, CFG.maxLateral);
+  // inclinação visual do corpo ao trocar de faixa
+  player.rotation.z = THREE.MathUtils.clamp((S.targetX - player.position.x) * 0.35, -0.4, 0.4);
+
+  /* --- esteira --- */
+  const move = S.speed * dt;
+
+  for (const d of dashes) {
+    d.position.z += move;
+    if (d.position.z > 12) d.position.z -= DASH_SPAN;
+  }
+
+  const pzMin = CFG.playerZ - 1.3;
+  const pzMax = CFG.playerZ + 1.3;
+  const px = player.position.x;
+
+  for (const o of obstacles) {
+    if (!o.userData.active) continue;
+    const z0 = o.position.z;
+    const z1 = z0 + move;
+    o.position.z = z1;
+
+    if (z1 > CFG.despawnZ) { o.userData.active = false; o.visible = false; continue; }
+
+    // colisão por INTERVALO percorrido (evita tunneling em alta velocidade)
+    if (z0 < pzMax && z1 > pzMin && Math.abs(o.position.x - px) < 1.15) {
+      gameOver();
+      return;
+    }
+  }
+
+  /* --- spawn --- */
+  S.spawnTimer -= dt;
+  if (S.spawnTimer <= 0) spawnRow();
+
+  /* --- HUD --- */
+  el.dist.textContent = Math.floor(S.distance) + ' m';
+  el.spd.textContent  = Math.round(S.speed * 3.6) + ' km/h';
+  el.fill.style.width = ((S.speed - CFG.baseSpeed) / (CFG.maxSpeed - CFG.baseSpeed) * 100) + '%';
+}
+
+function updateCamera(dt) {
+  const px = player.position.x;
+  camera.position.x += (px * 0.45 - camera.position.x) * Math.min(1, dt * 5);
+  camera.lookAt(px * 0.22, 1.0, -10);
+}
+
+/* ================= LOOP ================= */
+let last = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000); // clamp: evita saltos ao voltar do background
+  last = now;
+
+  if (S.mode === 'playing') updatePlaying(dt);
+
+  updateCamera(dt);
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(loop);
+
+/* ================= FLUXO DE INÍCIO ================= */
+async function start() {
+  // iOS 13+ exige permissão do giroscópio dentro de um gesto do usuário
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') el.warn.textContent = 'Giroscópio negado — use o dedo na tela para desviar.';
+    } catch (_) { /* segue sem giroscópio */ }
+  }
+
+  if (!S.hasGyro) {
+    window.addEventListener('deviceorientation', onOrientation);
+  }
+
+  // tela cheia (opcional, falha silenciosamente no iOS)
+  try {
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    }
+  } catch (_) {}
+
+  reset();
+  S.mode = 'playing';
+  el.overlay.classList.add('hidden');
+  el.warn.textContent = '';
+  last = performance.now();
+
+  setTimeout(() => {
+    if (!S.hasGyro) el.warn.textContent = 'Sem giroscópio detectado: arraste o dedo ou use ← →.';
+  }, 1500);
+}
+
+el.startBtn.addEventListener('click', start);
+el.calib.addEventListener('click', () => { S.tiltZero = null; });
+document.addEventListener('visibilitychange', () => { last = performance.now(); });
+
+// dica inicial
+if (!('ontouchstart' in window)) {
+  el.warn.textContent = 'No PC: use as setas ← → ou arraste o mouse.';
+}
+</script>
+</body>
+</html>
